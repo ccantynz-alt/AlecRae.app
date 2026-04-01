@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { verifySession } from '@/lib/auth';
-import { firmStore } from '../route';
+import { firmStore } from '@/lib/firm-store';
 
 async function checkAuth(request: NextRequest): Promise<NextResponse | null> {
   const session = request.cookies.get('alecrae_session')?.value;

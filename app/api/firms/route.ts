@@ -1,18 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { verifySession } from '@/lib/auth';
 import {
-  FirmProfile,
   FirmProfileInput,
   createFirmProfile,
   validateFirmProfile,
 } from '@/lib/firm-profiles';
-
-/**
- * In-memory store for firm profiles.
- * When the database (Neon PostgreSQL) is connected in Phase 2,
- * this will be replaced with proper database queries.
- */
-const firmStore = new Map<string, FirmProfile>();
+import { firmStore } from '@/lib/firm-store';
 
 async function checkAuth(request: NextRequest): Promise<NextResponse | null> {
   const session = request.cookies.get('alecrae_session')?.value;
@@ -22,9 +15,6 @@ async function checkAuth(request: NextRequest): Promise<NextResponse | null> {
   return null;
 }
 
-/**
- * GET /api/firms — List all firm profiles
- */
 export async function GET(request: NextRequest) {
   const authError = await checkAuth(request);
   if (authError) return authError;
@@ -36,9 +26,6 @@ export async function GET(request: NextRequest) {
   return NextResponse.json({ firms });
 }
 
-/**
- * POST /api/firms — Create a new firm profile
- */
 export async function POST(request: NextRequest) {
   const authError = await checkAuth(request);
   if (authError) return authError;
@@ -63,10 +50,6 @@ export async function POST(request: NextRequest) {
   }
 }
 
-/**
- * PUT /api/firms — Update an existing firm profile
- * Expects { id, ...updates } in the request body
- */
 export async function PUT(request: NextRequest) {
   const authError = await checkAuth(request);
   if (authError) return authError;
@@ -89,7 +72,7 @@ export async function PUT(request: NextRequest) {
       return NextResponse.json({ errors }, { status: 400 });
     }
 
-    const updated: FirmProfile = {
+    const updated = {
       ...existing,
       ...updates,
       id: existing.id,
@@ -107,6 +90,3 @@ export async function PUT(request: NextRequest) {
     );
   }
 }
-
-// Export for use in the [id] route
-export { firmStore };
