@@ -9,8 +9,18 @@ export async function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
+  // DB init route uses its own password check, not JWT
+  if (pathname.startsWith('/api/db/')) {
+    return NextResponse.next();
+  }
+
   // Protected routes — check session
-  if (pathname.startsWith('/app') || pathname.startsWith('/api/transcribe') || pathname.startsWith('/api/enhance')) {
+  // Stripe webhooks have their own signature verification
+  if (pathname === '/api/billing/webhook') {
+    return NextResponse.next();
+  }
+
+  if (pathname.startsWith('/app') || pathname.startsWith('/api/transcribe') || pathname.startsWith('/api/enhance') || pathname.startsWith('/api/dictations') || pathname.startsWith('/api/vocabulary') || pathname.startsWith('/api/settings') || pathname.startsWith('/api/analytics') || pathname.startsWith('/api/firms') || pathname.startsWith('/api/audio') || pathname.startsWith('/api/billing') || pathname.startsWith('/api/admin') || pathname.startsWith('/api/users') || pathname.startsWith('/api/whitelabel')) {
     const session = request.cookies.get('alecrae_session')?.value;
     if (!session) {
       if (pathname.startsWith('/api/')) {
@@ -34,5 +44,5 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ['/app/:path*', '/api/transcribe/:path*', '/api/enhance/:path*'],
+  matcher: ['/app/:path*', '/api/transcribe/:path*', '/api/transcribe-stream/:path*', '/api/transcribe-batch/:path*', '/api/enhance/:path*', '/api/dictations/:path*', '/api/vocabulary/:path*', '/api/settings/:path*', '/api/analytics/:path*', '/api/db/:path*', '/api/firms/:path*', '/api/audio/:path*', '/api/billing/:path*', '/api/admin/:path*', '/api/users/:path*', '/api/whitelabel/:path*'],
 };
