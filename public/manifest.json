@@ -1,0 +1,14 @@
+{
+  "name": "AlecRae Voice",
+  "short_name": "AlecRae Voice",
+  "description": "Professional dictation for legal and accounting professionals",
+  "start_url": "/app",
+  "display": "standalone",
+  "background_color": "#111920",
+  "theme_color": "#111920",
+  "orientation": "any",
+  "icons": [
+    { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png" }
+  ]
+}
