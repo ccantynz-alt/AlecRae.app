@@ -1,12 +1,17 @@
 import { NextRequest } from 'next/server';
 import Anthropic from '@anthropic-ai/sdk';
 import { SYSTEM_PROMPTS, DocMode } from '@/lib/templates';
+import { CONSUMER_SYSTEM_PROMPTS, ConsumerMode } from '@/lib/consumer-modes';
+import { buildGrammarPrompt, GrammarConfig } from '@/lib/grammar-engine';
+import { getLanguage } from '@/lib/languages';
 
 export const maxDuration = 60;
 
+type AllModes = DocMode | ConsumerMode;
+
 export async function POST(request: NextRequest) {
   try {
-    const { text, mode = 'general', customInstructions = '' } = await request.json();
+    const { text, mode = 'general', customInstructions = '', grammarConfig, language } = await request.json();
 
     if (!text || text.trim().length === 0) {
       return new Response(JSON.stringify({ error: 'No text provided' }), {
@@ -15,10 +20,31 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    const systemPrompt = SYSTEM_PROMPTS[mode as DocMode] || SYSTEM_PROMPTS['general'];
-    const fullSystem = customInstructions
-      ? `${systemPrompt}\n\nADDITIONAL USER INSTRUCTIONS:\n${customInstructions}`
-      : systemPrompt;
+    // Get system prompt from professional or consumer modes
+    const systemPrompt = SYSTEM_PROMPTS[mode as DocMode]
+      || CONSUMER_SYSTEM_PROMPTS[mode as ConsumerMode]
+      || SYSTEM_PROMPTS['general'];
+
+    // Build the full system prompt with optional grammar config and language
+    let fullSystem = systemPrompt;
+
+    // Add language context if specified
+    if (language) {
+      const lang = getLanguage(language);
+      if (lang) {
+        fullSystem += `\n\nLANGUAGE: Output in ${lang.name} (${lang.nativeName}). ${lang.grammarNotes}`;
+      }
+    }
+
+    // Add grammar rules if configured
+    if (grammarConfig) {
+      fullSystem += buildGrammarPrompt(grammarConfig as GrammarConfig);
+    }
+
+    // Add custom instructions
+    if (customInstructions) {
+      fullSystem += `\n\nADDITIONAL USER INSTRUCTIONS:\n${customInstructions}`;
+    }
 
     const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
