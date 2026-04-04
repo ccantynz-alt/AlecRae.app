@@ -74,6 +74,14 @@ export default function LoginPage() {
         <p className="text-ink-600 text-xs text-center mt-8">
           Secured access · All data encrypted in transit
         </p>
+        <div className="text-center mt-3">
+          <a
+            href="/privacy"
+            className="text-ink-500 hover:text-ink-300 text-xs transition-colors underline underline-offset-2"
+          >
+            Privacy &amp; Data Handling
+          </a>
+        </div>
       </div>
     </main>
   );

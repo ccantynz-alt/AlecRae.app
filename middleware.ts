@@ -5,7 +5,7 @@ export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
   // Public routes — no auth needed
-  if (pathname === '/' || pathname.startsWith('/api/auth') || pathname.startsWith('/_next') || pathname.startsWith('/manifest') || pathname.endsWith('.png') || pathname.endsWith('.ico')) {
+  if (pathname === '/' || pathname === '/privacy' || pathname.startsWith('/api/auth') || pathname.startsWith('/_next') || pathname.startsWith('/manifest') || pathname.endsWith('.png') || pathname.endsWith('.ico')) {
     return NextResponse.next();
   }
 
