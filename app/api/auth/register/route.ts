@@ -1,18 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { query, isDatabaseConfigured } from '@/lib/db';
+import { isDatabaseConfigured, query } from '@/lib/db';
 import { hashPassword, createUserSession, User } from '@/lib/auth-multi';
 import { rateLimiters } from '@/lib/rate-limit';
+import { findUserByEmail, createUser } from '@/lib/user-store';
 
 export async function POST(request: NextRequest) {
   const limited = rateLimiters.auth(request);
   if (limited) return limited;
-
-  if (!isDatabaseConfigured()) {
-    return NextResponse.json(
-      { error: 'Database not configured. Registration is unavailable.' },
-      { status: 503 }
-    );
-  }
 
   try {
     const body = await request.json();
@@ -23,62 +17,113 @@ export async function POST(request: NextRequest) {
       firmName?: string;
     };
 
+    // Validation
     if (!email || !password || !name) {
       return NextResponse.json(
-        { error: 'Email, password, and name are required' },
+        { error: 'Full name, email, and password are required.' },
+        { status: 400 }
+      );
+    }
+
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      return NextResponse.json(
+        { error: 'Please enter a valid email address.' },
         { status: 400 }
       );
     }
 
     if (password.length < 8) {
       return NextResponse.json(
-        { error: 'Password must be at least 8 characters' },
+        { error: 'Password must be at least 8 characters.' },
         { status: 400 }
       );
     }
 
-    // Check if user already exists
-    const existing = await query(`SELECT id FROM users WHERE email = $1`, [email]);
-    if (existing.length > 0) {
+    if (name.trim().length < 2) {
       return NextResponse.json(
-        { error: 'An account with this email already exists' },
-        { status: 409 }
+        { error: 'Please enter your full name.' },
+        { status: 400 }
       );
     }
 
     const passwordHash = await hashPassword(password);
 
-    // Create firm if firm name provided
-    let firmId: string | undefined;
-    if (firmName) {
-      const slug = firmName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
-      const firmResult = await query(
-        `INSERT INTO firms (name, slug) VALUES ($1, $2) RETURNING id`,
-        [firmName, slug]
+    // ─── Database path ───────────────────────────────────────
+    if (isDatabaseConfigured()) {
+      const existing = await query(`SELECT id FROM users WHERE email = $1`, [email]);
+      if (existing.length > 0) {
+        return NextResponse.json(
+          { error: 'An account with this email already exists.' },
+          { status: 409 }
+        );
+      }
+
+      let firmId: string | undefined;
+      if (firmName) {
+        const slug = firmName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+        const firmResult = await query(
+          `INSERT INTO firms (name, slug) VALUES ($1, $2) RETURNING id`,
+          [firmName, slug]
+        );
+        firmId = firmResult[0].id as string;
+      }
+
+      const result = await query(
+        `INSERT INTO users (email, password_hash, name, role, firm_id, firm_name, subscription_tier)
+         VALUES ($1, $2, $3, $4, $5, $6, $7)
+         RETURNING id, role, subscription_tier`,
+        [email, passwordHash, name, firmId ? 'owner' : 'user', firmId || null, firmName || null, 'free']
       );
-      firmId = firmResult[0].id as string;
+
+      const row = result[0];
+      const user: User = {
+        id: row.id as string,
+        email,
+        name,
+        role: row.role as User['role'],
+        firmId,
+        subscriptionTier: row.subscription_tier as User['subscriptionTier'],
+      };
+
+      const token = await createUserSession(user);
+      const response = NextResponse.json({ success: true, user });
+      response.cookies.set('alecrae_session', token, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'lax',
+        maxAge: 60 * 60 * 24 * 30,
+        path: '/',
+      });
+      return response;
     }
 
-    // Create user
-    const result = await query(
-      `INSERT INTO users (email, password_hash, name, role, firm_id, firm_name, subscription_tier)
-       VALUES ($1, $2, $3, $4, $5, $6, $7)
-       RETURNING id, role, subscription_tier`,
-      [email, passwordHash, name, firmId ? 'owner' : 'user', firmId || null, firmName || null, 'free']
-    );
+    // ─── In-memory path (no DATABASE_URL) ────────────────────
+    const existing = findUserByEmail(email);
+    if (existing) {
+      return NextResponse.json(
+        { error: 'An account with this email already exists.' },
+        { status: 409 }
+      );
+    }
 
-    const row = result[0];
-    const user: User = {
-      id: row.id as string,
+    const stored = createUser({
       email,
       name,
-      role: row.role as User['role'],
-      firmId,
-      subscriptionTier: row.subscription_tier as User['subscriptionTier'],
+      passwordHash,
+      firmName,
+    });
+
+    const user: User = {
+      id: stored.id,
+      email: stored.email,
+      name: stored.name,
+      role: stored.role,
+      firmId: stored.firmId,
+      subscriptionTier: stored.subscriptionTier,
     };
 
     const token = await createUserSession(user);
-
     const response = NextResponse.json({ success: true, user });
     response.cookies.set('alecrae_session', token, {
       httpOnly: true,
@@ -87,10 +132,12 @@ export async function POST(request: NextRequest) {
       maxAge: 60 * 60 * 24 * 30,
       path: '/',
     });
-
     return response;
   } catch (error: unknown) {
     console.error('Registration error:', error);
-    return NextResponse.json({ error: 'Registration failed', code: 'REGISTRATION_ERROR' }, { status: 500 });
+    return NextResponse.json(
+      { error: 'Registration failed. Please try again.', code: 'REGISTRATION_ERROR' },
+      { status: 500 }
+    );
   }
 }
