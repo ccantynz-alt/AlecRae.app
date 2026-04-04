@@ -6,8 +6,11 @@
 import { Hono } from "hono";
 import { cors } from "hono/cors";
 import { logger } from "hono/logger";
+import { authMiddleware } from "./auth/middleware.js";
 import { trpcServer } from "./trpc/server.js";
 import { healthRouter } from "./routes/health.js";
+import { streamRouter } from "./routes/stream.js";
+import { wsRouter } from "./realtime/websocket.js";
 
 const app = new Hono();
 
@@ -19,8 +22,11 @@ app.use(
 		credentials: true,
 	}),
 );
+app.use("*", authMiddleware);
 
 app.route("/", healthRouter);
+app.route("/", streamRouter);
+app.route("/", wsRouter);
 
 app.use("/trpc/*", trpcServer);
 

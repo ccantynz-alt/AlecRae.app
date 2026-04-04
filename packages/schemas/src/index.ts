@@ -13,5 +13,9 @@ export {
 	ComponentRegistryEntrySchema,
 	createComponentRegistry,
 } from "./registry.js";
+export { type BadgeProps, BadgeSchema } from "./ui/badge.js";
+export { type AlertProps, AlertSchema } from "./ui/alert.js";
+export { type SelectProps, SelectSchema } from "./ui/select.js";
+export { type TextareaProps, TextareaSchema } from "./ui/textarea.js";
 export { type ApiErrorResponse, type ApiSuccessResponse, ApiErrorSchema, ApiSuccessSchema } from "./api/responses.js";
 export { type PaginationInput, PaginationSchema } from "./api/pagination.js";
