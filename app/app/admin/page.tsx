@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
+import { useBranding } from '@/lib/BrandingContext';
 
 interface Stats {
   totalUsers: number;
@@ -30,7 +31,7 @@ export default function AdminDashboard() {
   const [planFilter, setPlanFilter] = useState('');
   const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(true);
-  const [tab, setTab] = useState<'overview' | 'users' | 'firms'>('overview');
+  const [tab, setTab] = useState<'overview' | 'users' | 'firms' | 'branding'>('overview');
   const [inviteEmail, setInviteEmail] = useState('');
   const [inviteName, setInviteName] = useState('');
   const [inviteRole, setInviteRole] = useState('user');
@@ -106,7 +107,7 @@ export default function AdminDashboard() {
           </h1>
         </div>
         <div className="flex gap-1">
-          {(['overview', 'users', 'firms'] as const).map(t => (
+          {(['overview', 'users', 'firms', 'branding'] as const).map(t => (
             <button
               key={t}
               onClick={() => setTab(t)}
@@ -308,6 +309,9 @@ export default function AdminDashboard() {
 
         {/* Firms Tab */}
         {tab === 'firms' && <FirmsManager />}
+
+        {/* Branding Tab */}
+        {tab === 'branding' && <BrandingManager />}
       </div>
     </div>
   );
@@ -489,6 +493,112 @@ function FirmsManager() {
           ))}
         </div>
       )}
+    </div>
+  );
+}
+
+// === Branding Manager Component ===
+function BrandingManager() {
+  const { branding, refresh } = useBranding();
+  const [appName, setAppName] = useState(branding.appName);
+  const [logoUrl, setLogoUrl] = useState(branding.logoUrl || '');
+  const [accentColor, setAccentColor] = useState(branding.accentColor);
+  const [saving, setSaving] = useState(false);
+  const [msg, setMsg] = useState('');
+
+  useEffect(() => {
+    setAppName(branding.appName);
+    setLogoUrl(branding.logoUrl || '');
+    setAccentColor(branding.accentColor);
+  }, [branding]);
+
+  const save = async () => {
+    setSaving(true);
+    try {
+      const res = await fetch('/api/whitelabel', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ config: { appName, logoUrl: logoUrl || undefined, accentColor, primaryColor: branding.primaryColor } }),
+      });
+      if (!res.ok) throw new Error('Save failed');
+      await refresh();
+      setMsg('Branding saved');
+      setTimeout(() => setMsg(''), 3000);
+    } catch {
+      setMsg('Failed to save');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="max-w-xl">
+      {msg && (
+        <div className={`mb-4 px-4 py-2 rounded-lg text-sm ${msg.includes('Failed') ? 'bg-red-500/10 text-red-300' : 'bg-emerald-500/10 text-emerald-300'}`}>
+          {msg}
+        </div>
+      )}
+
+      <div className="space-y-4">
+        <div>
+          <label className="text-xs text-ink-400 block mb-1">App title</label>
+          <input value={appName} onChange={e => setAppName(e.target.value)}
+            className="w-full bg-ink-800 border border-ink-700/50 rounded-lg px-3 py-2 text-sm text-ink-100 focus:border-gold-500/50 focus:outline-none" />
+        </div>
+
+        <div>
+          <label className="text-xs text-ink-400 block mb-1">Logo URL (optional)</label>
+          <input value={logoUrl} onChange={e => setLogoUrl(e.target.value)} placeholder="https://..."
+            className="w-full bg-ink-800 border border-ink-700/50 rounded-lg px-3 py-2 text-sm text-ink-100 placeholder:text-ink-600 focus:border-gold-500/50 focus:outline-none" />
+          {logoUrl && (
+            <div className="mt-2 p-3 bg-ink-800/50 rounded-lg">
+              <img src={logoUrl} alt="Logo preview" className="h-8 object-contain" onError={e => (e.currentTarget.style.display = 'none')} />
+            </div>
+          )}
+        </div>
+
+        <div>
+          <label className="text-xs text-ink-400 block mb-1">Accent colour</label>
+          <div className="flex items-center gap-3">
+            <input type="color" value={accentColor} onChange={e => setAccentColor(e.target.value)}
+              className="w-10 h-10 rounded-lg border border-ink-700/50 cursor-pointer bg-transparent" />
+            <input value={accentColor} onChange={e => setAccentColor(e.target.value)}
+              className="flex-1 bg-ink-800 border border-ink-700/50 rounded-lg px-3 py-2 text-sm text-ink-100 font-mono focus:border-gold-500/50 focus:outline-none" />
+          </div>
+        </div>
+
+        {/* Live preview */}
+        <div>
+          <label className="text-xs text-ink-400 block mb-2">Preview</label>
+          <div className="bg-ink-900 border border-ink-800/50 rounded-xl p-4 space-y-3">
+            <div className="flex items-center gap-2">
+              {logoUrl ? (
+                <img src={logoUrl} alt="" className="h-6" onError={e => (e.currentTarget.style.display = 'none')} />
+              ) : (
+                <span className="font-display text-sm text-ink-50">
+                  {appName.includes(' ') ? (
+                    <>{appName.split(' ').slice(0, -1).join(' ')} <span style={{ color: accentColor }}>{appName.split(' ').pop()}</span></>
+                  ) : (
+                    <span style={{ color: accentColor }}>{appName}</span>
+                  )}
+                </span>
+              )}
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="w-8 h-8 rounded-xl" style={{ backgroundColor: accentColor }} />
+              <button className="px-3 py-1.5 rounded-lg text-xs font-medium text-ink-950" style={{ backgroundColor: accentColor }}>
+                Enhance
+              </button>
+              <span className="text-xs" style={{ color: accentColor }}>Accent text</span>
+            </div>
+          </div>
+        </div>
+
+        <button onClick={save} disabled={saving}
+          className="w-full py-2.5 rounded-lg text-sm font-medium bg-gold-500 text-ink-950 hover:bg-gold-400 disabled:opacity-50">
+          {saving ? 'Saving...' : 'Save Branding'}
+        </button>
+      </div>
     </div>
   );
 }

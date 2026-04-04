@@ -2,6 +2,13 @@
 @tailwind components;
 @tailwind utilities;
 
+:root {
+  --brand-accent: #c4a23a;
+  --brand-accent-light: #d4b55c;
+  --brand-accent-20: rgba(196, 162, 58, 0.2);
+  --brand-primary: #0a0a0a;
+}
+
 * { -webkit-tap-highlight-color: transparent; }
 html { scroll-behavior: smooth; }
 
@@ -25,7 +32,7 @@ html { scroll-behavior: smooth; }
 .stream-cursor::after {
   content: '▎';
   animation: stream-cursor 0.8s infinite;
-  color: #c4a23a;
+  color: var(--brand-accent);
 }
 
 ::-webkit-scrollbar { width: 5px; height: 5px; }
@@ -33,7 +40,7 @@ html { scroll-behavior: smooth; }
 ::-webkit-scrollbar-thumb { background: #3b4858; border-radius: 4px; }
 ::-webkit-scrollbar-thumb:hover { background: #4a5b6e; }
 
-::selection { background: rgba(196, 162, 58, 0.2); }
+::selection { background: var(--brand-accent-20); }
 
 textarea:focus, input:focus { outline: none; }
 

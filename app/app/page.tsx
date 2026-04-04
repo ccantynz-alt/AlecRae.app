@@ -3,6 +3,7 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
 import { detectDocumentType } from '@/lib/auto-detect';
 import { BUILT_IN_TEMPLATES, fillTemplate, type DocumentTemplate } from '@/lib/templates-fillable';
+import { useBranding } from '@/lib/BrandingContext';
 
 // === Types ===
 type DocMode = 'general' | 'legal-letter' | 'legal-memo' | 'court-filing' | 'demand-letter' | 'deposition-summary' | 'engagement-letter' | 'accounting-report' | 'tax-advisory' | 'audit-opinion' | 'client-email' | 'meeting-notes';
@@ -48,6 +49,8 @@ function saveJSON(key: string, value: any) {
 
 // === Main Component ===
 export default function DictationApp() {
+  const { branding } = useBranding();
+
   // Core state
   const [isRecording, setIsRecording] = useState(false);
   const [isTranscribing, setIsTranscribing] = useState(false);
@@ -562,7 +565,8 @@ export default function DictationApp() {
       const doc = new Document({ sections: [{ children: paragraphs }] });
       const blob = await Packer.toBlob(doc);
       const { saveAs } = await import('file-saver');
-      const filename = `AlecRae_${mode}_${new Date().toISOString().split('T')[0]}.docx`;
+      const brandSlug = branding.appName.replace(/\s+/g, '');
+      const filename = `${brandSlug}_${mode}_${new Date().toISOString().split('T')[0]}.docx`;
       saveAs(blob, filename);
     } catch (err: any) {
       setError('Export failed: ' + err.message);
@@ -644,9 +648,17 @@ export default function DictationApp() {
       {/* Header */}
       <header className="shrink-0 border-b border-ink-800/60 px-4 py-3 flex items-center justify-between gap-3">
         <div className="flex items-center gap-3">
-          <h1 className="font-display text-lg text-ink-50">
-            AlecRae <span className="text-gold-400">Voice</span>
-          </h1>
+          {branding.logoUrl ? (
+            <img src={branding.logoUrl} alt={branding.appName} className="h-7" />
+          ) : (
+            <h1 className="font-display text-lg text-ink-50">
+              {branding.appName.includes(' ') ? (
+                <>{branding.appName.split(' ').slice(0, -1).join(' ')} <span style={{ color: 'var(--brand-accent)' }}>{branding.appName.split(' ').pop()}</span></>
+              ) : (
+                <span style={{ color: 'var(--brand-accent)' }}>{branding.appName}</span>
+              )}
+            </h1>
+          )}
           {privacyMode && (
             <span className="text-[10px] bg-red-500/20 text-red-300 px-2 py-0.5 rounded-full">PRIVACY</span>
           )}
