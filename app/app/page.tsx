@@ -646,7 +646,7 @@ export default function DictationApp() {
   return (
     <div className="h-full flex flex-col">
       {/* Header */}
-      <header className="shrink-0 border-b border-ink-800/60 px-4 py-3 flex items-center justify-between gap-3">
+      <header className="shrink-0 glass-header px-4 py-3 flex items-center justify-between gap-3">
         <div className="flex items-center gap-3">
           {branding.logoUrl ? (
             <img src={branding.logoUrl} alt={branding.appName} className="h-7" />
@@ -975,7 +975,7 @@ export default function DictationApp() {
                   ? 'bg-red-500 recording-pulse'
                   : isTranscribing
                   ? 'bg-ink-700 cursor-wait'
-                  : 'bg-gold-500 hover:bg-gold-400 hover:scale-105'
+                  : 'bg-gold-500 hover:bg-gold-400 hover:scale-105 gold-idle-pulse'
               }`}
             >
               {isTranscribing ? (
@@ -996,6 +996,12 @@ export default function DictationApp() {
               {isRecording ? (
                 <div>
                   <div className="flex items-center gap-2">
+                    {/* Audio waveform bars */}
+                    <div className="flex items-center gap-[3px] h-5">
+                      {[1,2,3,4,5].map(i => (
+                        <div key={i} className="w-[3px] bg-red-400 rounded-full waveform-bar" />
+                      ))}
+                    </div>
                     <p className="text-red-400 text-sm font-medium">Recording {formatTime(duration)}</p>
                     {isLiveActive && (
                       <span className="inline-flex items-center gap-1 text-[10px] bg-emerald-500/20 text-emerald-300 px-2 py-0.5 rounded-full font-medium">
@@ -1043,7 +1049,7 @@ export default function DictationApp() {
               <select
                 value={mode}
                 onChange={e => setMode(e.target.value as DocMode)}
-                className="bg-ink-800 border border-ink-700/50 rounded-lg px-3 py-2 text-sm text-ink-200 focus:border-gold-500/50 max-w-[200px]"
+                className="bg-ink-800 border border-ink-700/50 rounded-lg px-3 py-2 text-sm text-ink-200 focus:border-gold-500/50 max-w-[200px] mode-select"
               >
                 <optgroup label="General">
                   {MODES.filter(m => m.cat === 'general').map(m => <option key={m.value} value={m.value}>{m.label}</option>)}
@@ -1120,7 +1126,9 @@ export default function DictationApp() {
             </div>
 
             {/* Enhanced Panel */}
-            <div className="flex flex-col min-h-0 bg-ink-900/40 rounded-xl border border-ink-800/50 overflow-hidden">
+            <div className={`flex flex-col min-h-0 bg-ink-900/40 rounded-xl border overflow-hidden transition-all duration-300 ${
+              isEnhancing ? 'border-gold-500/30 enhance-glow' : 'border-ink-800/50'
+            }`}>
               <div className="shrink-0 flex items-center justify-between px-4 py-2 border-b border-ink-800/40">
                 <span className="text-xs text-gold-400 font-medium">
                   Enhanced {isEnhancing && <span className="stream-cursor" />}
@@ -1239,7 +1247,7 @@ export default function DictationApp() {
               className={`px-5 py-2.5 rounded-xl text-sm font-medium transition-all ${
                 !rawText.trim() || isEnhancing
                   ? 'bg-ink-800 text-ink-500 cursor-not-allowed'
-                  : 'bg-gold-500 text-ink-950 hover:bg-gold-400 shadow-sm'
+                  : 'bg-gold-500 text-ink-950 hover:bg-gold-400 shadow-sm btn-premium'
               }`}
             >
               {isEnhancing ? 'Enhancing...' : `Enhance (${hotkeys.enhance})`}
