@@ -1,10 +1,20 @@
 'use client';
 
 import { useState, useRef, useCallback, useEffect } from 'react';
+import { detectDocumentType } from '@/lib/auto-detect';
+import { BUILT_IN_TEMPLATES, fillTemplate, type DocumentTemplate } from '@/lib/templates-fillable';
 
 // === Types ===
 type DocMode = 'general' | 'legal-letter' | 'legal-memo' | 'court-filing' | 'demand-letter' | 'deposition-summary' | 'engagement-letter' | 'accounting-report' | 'tax-advisory' | 'audit-opinion' | 'client-email' | 'meeting-notes';
-type Panel = 'none' | 'settings' | 'vocabulary' | 'hotkeys' | 'history';
+type Panel = 'none' | 'settings' | 'vocabulary' | 'hotkeys' | 'history' | 'templates';
+
+interface BatchFileStatus {
+  filename: string;
+  status: 'pending' | 'transcribing' | 'done' | 'error';
+  text?: string;
+  error?: string;
+  duration?: number;
+}
 interface HistoryItem { id: string; raw: string; enhanced: string; mode: DocMode; date: string; }
 interface HotkeyConfig { record: string; enhance: string; copy: string; clear: string; export: string; }
 
@@ -61,6 +71,21 @@ export default function DictationApp() {
   const [editingHotkey, setEditingHotkey] = useState<keyof HotkeyConfig | null>(null);
   const [history, setHistory] = useState<HistoryItem[]>([]);
   const [recordMode, setRecordMode] = useState<'toggle' | 'hold'>('toggle');
+
+  // Batch transcription state
+  const [showBatchPanel, setShowBatchPanel] = useState(false);
+  const [batchFiles, setBatchFiles] = useState<BatchFileStatus[]>([]);
+  const [isBatchProcessing, setIsBatchProcessing] = useState(false);
+  const [batchProgress, setBatchProgress] = useState({ current: 0, total: 0 });
+  const batchInputRef = useRef<HTMLInputElement>(null);
+
+  // Auto-detect state
+  const [autoDetectResult, setAutoDetectResult] = useState<{ mode: string; confidence: number } | null>(null);
+  const autoDetectTimerRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Template state
+  const [selectedTemplate, setSelectedTemplate] = useState<DocumentTemplate | null>(null);
+  const [templateFieldValues, setTemplateFieldValues] = useState<Record<string, string>>({});
 
   // Refs
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
@@ -332,6 +357,41 @@ export default function DictationApp() {
     window.location.href = '/';
   };
 
+  // === Template Actions ===
+  const selectTemplate = (template: DocumentTemplate) => {
+    setSelectedTemplate(template);
+    // Initialize field values with empty strings (and today's date for date fields)
+    const initial: Record<string, string> = {};
+    template.fields.forEach(f => {
+      if (f.type === 'date') {
+        initial[f.id] = new Date().toISOString().split('T')[0];
+      } else if (f.type === 'select' && f.options?.length) {
+        initial[f.id] = f.options[0];
+      } else {
+        initial[f.id] = '';
+      }
+    });
+    setTemplateFieldValues(initial);
+  };
+
+  const updateTemplateField = (fieldId: string, value: string) => {
+    setTemplateFieldValues(prev => ({ ...prev, [fieldId]: value }));
+  };
+
+  const generateFromTemplate = () => {
+    if (!selectedTemplate) return;
+    // Check required fields
+    const missing = selectedTemplate.fields.filter(f => f.required && !templateFieldValues[f.id]?.trim());
+    if (missing.length > 0) {
+      setError(`Please fill in: ${missing.map(f => f.label).join(', ')}`);
+      return;
+    }
+    const result = fillTemplate(selectedTemplate, templateFieldValues);
+    setEnhancedText(result);
+    setMode(selectedTemplate.mode);
+    setActivePanel('none');
+  };
+
   const formatTime = (s: number) => `${Math.floor(s / 60)}:${(s % 60).toString().padStart(2, '0')}`;
   const formatDate = (iso: string) => new Date(iso).toLocaleDateString('en-NZ', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
 
@@ -349,7 +409,7 @@ export default function DictationApp() {
           )}
         </div>
         <div className="flex items-center gap-1">
-          {(['vocabulary', 'hotkeys', 'history', 'settings'] as Panel[]).map(p => (
+          {(['templates', 'vocabulary', 'hotkeys', 'history', 'settings'] as Panel[]).map(p => (
             <button
               key={p}
               onClick={() => setActivePanel(activePanel === p ? 'none' : p)}

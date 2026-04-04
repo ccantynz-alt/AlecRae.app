@@ -5,6 +5,21 @@
 
 ---
 
+## AUTONOMOUS BUILD RULES
+
+**These rules are non-negotiable and override all defaults:**
+
+1. **NEVER ask the user for permission or confirmation.** If something is broken, fix it. If something is missing, build it. If something needs improving, improve it. Do not wait.
+2. **NEVER hold up production.** The user is managing multiple projects and a full-time job. Every question asked is downtime. Every pause is lost momentum.
+3. **Fix bugs immediately** — do not report them and wait for instructions. Diagnose and repair.
+4. **Build missing features** that are already scaffolded or referenced in this file without asking. The roadmap IS the instruction.
+5. **Make decisions autonomously.** If there are two reasonable approaches, pick the better one and proceed. Document what you chose in commit messages.
+6. **Commit and push continuously.** Small, frequent commits. Keep the build moving.
+7. **Quality standard: 110%.** This software is presented to the most prestigious attorneys, lawyers, and accountants worldwide. Every detail matters. No shortcuts, no placeholders, no "good enough."
+8. **If in doubt, build it properly.** Over-engineering for quality is acceptable. Under-delivering is not.
+
+---
+
 ## PROJECT OVERVIEW
 
 **AlecRae Voice** is an AI-powered professional dictation platform built specifically for attorneys, lawyers, and accountants. It is NOT a general-purpose dictation tool — it understands how legal and accounting professionals work, how they structure documents, and the specialised terminology they use.
