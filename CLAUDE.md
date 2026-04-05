@@ -60,7 +60,7 @@
 - [x] Search across dictation history (real-time filtering across raw text, enhanced text, mode, date)
 - [x] Firm profile management UI (create/edit/delete firms in admin dashboard)
 - [x] White-label branding system (BrandingContext provider, CSS custom properties, admin Branding tab)
-- [ ] Pre-loaded legal/accounting vocabulary (5,000+ built-in terms — IN PROGRESS)
+- [x] Pre-loaded legal/accounting vocabulary (5,000+ built-in terms across 15 categories, mode-specific selection)
 - [ ] Audio playback of original recordings
 
 ### Wave 3 Features (COMPLETE — April 2026)
