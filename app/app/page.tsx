@@ -16,7 +16,7 @@ interface BatchFileStatus {
   error?: string;
   duration?: number;
 }
-interface HistoryItem { id: string; raw: string; enhanced: string; mode: DocMode; date: string; }
+interface HistoryItem { id: string; raw: string; enhanced: string; mode: DocMode; date: string; audioData?: string; audioMimeType?: string; }
 interface HotkeyConfig { record: string; enhance: string; copy: string; clear: string; export: string; }
 
 // === Mode Configs ===
@@ -44,7 +44,17 @@ function loadJSON<T>(key: string, fallback: T): T {
 }
 function saveJSON(key: string, value: any) {
   if (typeof window === 'undefined') return;
-  try { localStorage.setItem(key, JSON.stringify(value)); } catch {}
+  try {
+    localStorage.setItem(key, JSON.stringify(value));
+  } catch (e) {
+    // If quota exceeded and saving history, retry without audio data
+    if (key === 'av_history' && Array.isArray(value)) {
+      try {
+        const stripped = value.map((item: any) => ({ ...item, audioData: undefined, audioMimeType: undefined }));
+        localStorage.setItem(key, JSON.stringify(stripped));
+      } catch { /* truly full, nothing we can do */ }
+    }
+  }
 }
 
 // === Main Component ===
@@ -101,6 +111,12 @@ export default function DictationApp() {
   // Template state
   const [selectedTemplate, setSelectedTemplate] = useState<DocumentTemplate | null>(null);
   const [templateFieldValues, setTemplateFieldValues] = useState<Record<string, string>>({});
+
+  // Audio playback state
+  const [playingAudioId, setPlayingAudioId] = useState<string | null>(null);
+  const [audioProgress, setAudioProgress] = useState(0);
+  const audioElementRef = useRef<HTMLAudioElement | null>(null);
+  const lastRecordedAudioRef = useRef<{ base64: string; mimeType: string } | null>(null);
 
   // Refs
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
@@ -295,9 +311,26 @@ export default function DictationApp() {
       recorder.onstop = async () => {
         stream.getTracks().forEach(t => t.stop());
         if (timerRef.current) clearInterval(timerRef.current);
+
+        // Save audio as base64 for playback (cap at 5MB)
+        const fullBlob = new Blob(chunksRef.current, { type: mimeType });
+        if (fullBlob.size > 0 && fullBlob.size <= 5 * 1024 * 1024) {
+          try {
+            const reader = new FileReader();
+            reader.onloadend = () => {
+              if (typeof reader.result === 'string') {
+                lastRecordedAudioRef.current = { base64: reader.result, mimeType };
+              }
+            };
+            reader.readAsDataURL(fullBlob);
+          } catch { /* audio save is best-effort */ }
+        } else {
+          lastRecordedAudioRef.current = null;
+        }
+
         // In live mode, skip the final full-blob transcription (text already streamed)
         if (transcriptionMode === 'live') return;
-        const blob = new Blob(chunksRef.current, { type: mimeType });
+        const blob = fullBlob;
         if (blob.size < 500) { setError('Recording too short'); return; }
         await transcribeAudio(blob, mimeType);
       };
@@ -413,7 +446,9 @@ export default function DictationApp() {
         }
       }
 
-      // Save to history
+      // Save to history (include audio if available and not in privacy mode)
+      const audioSnapshot = lastRecordedAudioRef.current;
+      lastRecordedAudioRef.current = null;
       setHistory(prev => {
         const item: HistoryItem = {
           id: Date.now().toString(),
@@ -421,9 +456,16 @@ export default function DictationApp() {
           enhanced: '', // Will be updated below
           mode,
           date: new Date().toISOString(),
+          ...(audioSnapshot && !privacyMode ? { audioData: audioSnapshot.base64, audioMimeType: audioSnapshot.mimeType } : {}),
         };
         const updated = [item, ...prev].slice(0, 50);
-        saveJSON('av_history', updated);
+        // Try saving; if localStorage is full, save without audio
+        try {
+          saveJSON('av_history', updated);
+        } catch {
+          const withoutAudio = updated.map(h => ({ ...h, audioData: undefined, audioMimeType: undefined }));
+          saveJSON('av_history', withoutAudio);
+        }
         return updated;
       });
     } catch (err: any) {
@@ -641,6 +683,61 @@ export default function DictationApp() {
 
   const formatTime = (s: number) => `${Math.floor(s / 60)}:${(s % 60).toString().padStart(2, '0')}`;
   const formatDate = (iso: string) => new Date(iso).toLocaleDateString('en-NZ', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+
+  // === Audio Playback ===
+  const toggleAudioPlayback = useCallback((itemId: string, audioData: string) => {
+    // If already playing this item, pause it
+    if (playingAudioId === itemId && audioElementRef.current) {
+      audioElementRef.current.pause();
+      setPlayingAudioId(null);
+      setAudioProgress(0);
+      return;
+    }
+
+    // Stop any current playback
+    if (audioElementRef.current) {
+      audioElementRef.current.pause();
+      audioElementRef.current = null;
+    }
+
+    const audio = new Audio(audioData);
+    audioElementRef.current = audio;
+    setPlayingAudioId(itemId);
+    setAudioProgress(0);
+
+    audio.addEventListener('timeupdate', () => {
+      if (audio.duration > 0) {
+        setAudioProgress(audio.currentTime / audio.duration);
+      }
+    });
+
+    audio.addEventListener('ended', () => {
+      setPlayingAudioId(null);
+      setAudioProgress(0);
+      audioElementRef.current = null;
+    });
+
+    audio.addEventListener('error', () => {
+      setPlayingAudioId(null);
+      setAudioProgress(0);
+      audioElementRef.current = null;
+    });
+
+    audio.play().catch(() => {
+      setPlayingAudioId(null);
+      audioElementRef.current = null;
+    });
+  }, [playingAudioId]);
+
+  // Cleanup audio on unmount
+  useEffect(() => {
+    return () => {
+      if (audioElementRef.current) {
+        audioElementRef.current.pause();
+        audioElementRef.current = null;
+      }
+    };
+  }, []);
 
   // === Render ===
   return (
@@ -882,15 +979,58 @@ export default function DictationApp() {
                     return filtered.map(item => {
                       const modeLabel = MODES.find(m => m.value === item.mode)?.label || item.mode;
                       const preview = item.raw.slice(0, 120);
+                      const isPlaying = playingAudioId === item.id;
                       return (
-                        <button
-                          key={item.id}
-                          onClick={() => loadFromHistory(item)}
-                          className="w-full text-left bg-ink-800/50 hover:bg-ink-800 rounded-lg px-3 py-2 transition-colors"
-                        >
-                          <p className="text-xs text-ink-400 mb-1">{formatDate(item.date)} · {modeLabel}</p>
-                          <p className="text-sm text-ink-200 line-clamp-2">{preview}...</p>
-                        </button>
+                        <div key={item.id} className="relative">
+                          <button
+                            onClick={() => loadFromHistory(item)}
+                            className="w-full text-left bg-ink-800/50 hover:bg-ink-800 rounded-lg px-3 py-2 transition-colors"
+                          >
+                            <div className="flex items-center justify-between mb-1">
+                              <p className="text-xs text-ink-400">{formatDate(item.date)} · {modeLabel}</p>
+                              {item.audioData && (
+                                <span
+                                  role="button"
+                                  tabIndex={0}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    toggleAudioPlayback(item.id, item.audioData!);
+                                  }}
+                                  onKeyDown={(e) => {
+                                    if (e.key === 'Enter' || e.key === ' ') {
+                                      e.stopPropagation();
+                                      e.preventDefault();
+                                      toggleAudioPlayback(item.id, item.audioData!);
+                                    }
+                                  }}
+                                  className="flex items-center gap-1 px-1.5 py-0.5 rounded hover:bg-ink-700/50 transition-colors group"
+                                  title={isPlaying ? 'Pause audio' : 'Play recording'}
+                                >
+                                  {isPlaying ? (
+                                    <svg width="12" height="12" viewBox="0 0 12 12" fill="none" className="text-[#c4a23a]">
+                                      <rect x="2" y="2" width="3" height="8" rx="0.5" fill="currentColor" />
+                                      <rect x="7" y="2" width="3" height="8" rx="0.5" fill="currentColor" />
+                                    </svg>
+                                  ) : (
+                                    <svg width="12" height="12" viewBox="0 0 12 12" fill="none" className="text-[#c4a23a] group-hover:text-[#d4b24a]">
+                                      <path d="M3 1.5V10.5L10.5 6L3 1.5Z" fill="currentColor" />
+                                    </svg>
+                                  )}
+                                </span>
+                              )}
+                            </div>
+                            {/* Audio progress bar */}
+                            {isPlaying && (
+                              <div className="w-full h-0.5 bg-ink-700 rounded-full mb-1.5 overflow-hidden">
+                                <div
+                                  className="h-full bg-[#c4a23a] rounded-full transition-all duration-200"
+                                  style={{ width: `${audioProgress * 100}%` }}
+                                />
+                              </div>
+                            )}
+                            <p className="text-sm text-ink-200 line-clamp-2">{preview}...</p>
+                          </button>
+                        </div>
                       );
                     });
                   })()}
