@@ -7,6 +7,9 @@ import { router, publicProcedure } from "./init.js";
 import { projectRouter } from "./procedures/projects.js";
 import { userRouter } from "./procedures/users.js";
 import { aiRouter } from "./procedures/ai.js";
+import { authRouter } from "./procedures/auth.js";
+import { billingRouter } from "./procedures/billing.js";
+import { settingsRouter } from "./procedures/settings.js";
 
 export const appRouter = router({
 	health: publicProcedure.query(() => {
@@ -20,6 +23,9 @@ export const appRouter = router({
 	project: projectRouter,
 	user: userRouter,
 	ai: aiRouter,
+	auth: authRouter,
+	billing: billingRouter,
+	settings: settingsRouter,
 });
 
 export type AppRouter = typeof appRouter;

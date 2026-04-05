@@ -12,6 +12,13 @@ export const trpc = createTRPCClient<AppRouter>({
 		httpBatchLink({
 			url: getApiUrl(),
 			transformer: superjson,
+			headers() {
+				const token =
+					typeof localStorage !== "undefined"
+						? localStorage.getItem("btf_token")
+						: null;
+				return token ? { Authorization: `Bearer ${token}` } : {};
+			},
 		}),
 	],
 });

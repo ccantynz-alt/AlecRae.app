@@ -4,6 +4,7 @@
  */
 
 import { createSignal, createRoot, createEffect } from "solid-js";
+import { trpc } from "~/lib/trpc.js";
 
 export interface User {
 	id: string;
@@ -48,6 +49,36 @@ function createAuthStore() {
 		}
 	}
 
+	/**
+	 * Validate the stored token against the server.
+	 * Call this on app mount to rehydrate the session.
+	 */
+	async function checkAuth(): Promise<User | null> {
+		const stored = typeof localStorage !== "undefined" ? localStorage.getItem("btf_token") : null;
+		if (!stored) {
+			setIsLoading(false);
+			return null;
+		}
+
+		setIsLoading(true);
+		try {
+			const me = await trpc.auth.me.query();
+			if (me) {
+				setUser(me);
+				setToken(stored);
+				return me;
+			}
+			// Token is invalid / expired — clear it
+			logout();
+			return null;
+		} catch {
+			logout();
+			return null;
+		} finally {
+			setIsLoading(false);
+		}
+	}
+
 	return {
 		user,
 		token,
@@ -55,6 +86,7 @@ function createAuthStore() {
 		isLoading,
 		login,
 		logout,
+		checkAuth,
 	};
 }
 

@@ -11,7 +11,9 @@ import { securityHeaders, requestId, rateLimit } from "./routes/security.js";
 import { trpcServer } from "./trpc/server.js";
 import { healthRouter } from "./routes/health.js";
 import { streamRouter } from "./routes/stream.js";
+import { stripeRouter } from "./routes/stripe.js";
 import { wsRouter } from "./realtime/websocket.js";
+import { dbInitRouter } from "./routes/db-init.js";
 
 const app = new Hono();
 
@@ -37,7 +39,9 @@ app.use("*", authMiddleware);
 // Routes
 app.route("/", healthRouter);
 app.route("/", streamRouter);
+app.route("/", stripeRouter);
 app.route("/", wsRouter);
+app.route("/", dbInitRouter);
 
 // tRPC
 app.use("/trpc/*", trpcServer);

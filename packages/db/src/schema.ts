@@ -51,3 +51,31 @@ export const aiSessions = sqliteTable("ai_sessions", {
 	createdAt: text("created_at").notNull().default(sql`(current_timestamp)`),
 	completedAt: text("completed_at"),
 });
+
+// --- Billing tables ---
+
+export const prices = sqliteTable("prices", {
+	id: text("id").primaryKey(),
+	stripeProductId: text("stripe_product_id").notNull(),
+	stripePriceId: text("stripe_price_id").notNull().unique(),
+	amount: integer("amount").notNull(),
+	currency: text("currency").notNull().default("usd"),
+	interval: text("interval", { enum: ["month", "year"] }).notNull().default("month"),
+	active: integer("active", { mode: "boolean" }).notNull().default(true),
+});
+
+export const subscriptions = sqliteTable("subscriptions", {
+	id: text("id").primaryKey(),
+	userId: text("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+	stripeCustomerId: text("stripe_customer_id").notNull(),
+	stripeSubscriptionId: text("stripe_subscription_id").unique(),
+	stripePriceId: text("stripe_price_id"),
+	status: text("status", {
+		enum: ["active", "canceled", "incomplete", "incomplete_expired", "past_due", "trialing", "unpaid", "paused"],
+	}).notNull().default("active"),
+	currentPeriodStart: text("current_period_start"),
+	currentPeriodEnd: text("current_period_end"),
+	cancelAtPeriodEnd: integer("cancel_at_period_end", { mode: "boolean" }).notNull().default(false),
+	createdAt: text("created_at").notNull().default(sql`(current_timestamp)`),
+	updatedAt: text("updated_at").notNull().default(sql`(current_timestamp)`),
+});
