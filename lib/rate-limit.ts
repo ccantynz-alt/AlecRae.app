@@ -162,4 +162,22 @@ export const rateLimiters = {
 
   /** Billing routes — 10 requests per minute */
   billing: createRateLimiter({ maxRequests: 10, windowSeconds: 60 }),
+
+  /** Voxlen TTS routes — 15 requests per minute */
+  voxlenSynthesize: createRateLimiter({ maxRequests: 15, windowSeconds: 60 }),
+
+  /** Voxlen translation routes — 10 requests per minute */
+  voxlenTranslate: createRateLimiter({ maxRequests: 10, windowSeconds: 60 }),
+
+  /** Voxlen voice cloning — 3 requests per minute (expensive operation) */
+  voxlenClone: createRateLimiter({ maxRequests: 3, windowSeconds: 60 }),
+
+  /** Voxlen sentiment analysis — 20 requests per minute */
+  voxlenSentiment: createRateLimiter({ maxRequests: 20, windowSeconds: 60 }),
+
+  /** Voxlen voiceprint — 5 requests per minute (security-sensitive) */
+  voxlenVoiceprint: createRateLimiter({ maxRequests: 5, windowSeconds: 60 }),
+
+  /** Voxlen diarization — 5 requests per minute (heavy processing) */
+  voxlenDiarize: createRateLimiter({ maxRequests: 5, windowSeconds: 60 }),
 };

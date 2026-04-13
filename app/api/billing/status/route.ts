@@ -1,11 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getUserFromRequest } from '@/lib/auth-multi';
+import { isVoxlenConfigured } from '@/lib/voxlen';
 
 export interface BillingStatus {
-  plan: 'free' | 'pro' | 'enterprise';
+  plan: 'free' | 'personal' | 'pro' | 'enterprise';
   subscriptionStatus: 'active' | 'past_due' | 'cancelled' | 'none';
   stripeConfigured: boolean;
   databaseConfigured: boolean;
+  voxlenConfigured: boolean;
 }
 
 /**
@@ -20,6 +22,7 @@ export interface BillingStatus {
 export async function GET(request: NextRequest) {
   const stripeConfigured = !!process.env.STRIPE_SECRET_KEY;
   const databaseConfigured = !!process.env.DATABASE_URL;
+  const voxlenConfigured = isVoxlenConfigured();
 
   // --- Attempt 1: Read plan from multi-user JWT claims ---
   const multiUser = await getUserFromRequest(request);
@@ -40,6 +43,7 @@ export async function GET(request: NextRequest) {
             subscriptionStatus: (row.subscription_status as BillingStatus['subscriptionStatus']) || 'none',
             stripeConfigured,
             databaseConfigured,
+            voxlenConfigured,
           } satisfies BillingStatus);
         }
       } catch {
@@ -53,6 +57,7 @@ export async function GET(request: NextRequest) {
       subscriptionStatus: multiUser.subscriptionTier !== 'free' ? 'active' : 'none',
       stripeConfigured,
       databaseConfigured,
+      voxlenConfigured,
     } satisfies BillingStatus);
   }
 
@@ -71,6 +76,7 @@ export async function GET(request: NextRequest) {
           subscriptionStatus: (row.subscription_status as BillingStatus['subscriptionStatus']) || 'none',
           stripeConfigured,
           databaseConfigured,
+          voxlenConfigured,
         } satisfies BillingStatus);
       }
     } catch {
@@ -84,5 +90,6 @@ export async function GET(request: NextRequest) {
     subscriptionStatus: 'none',
     stripeConfigured,
     databaseConfigured,
+    voxlenConfigured,
   } satisfies BillingStatus);
 }

@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 
-type PlanId = 'free' | 'pro' | 'enterprise';
+type PlanId = 'free' | 'personal' | 'pro' | 'enterprise';
 
 interface BillingStatus {
   plan: PlanId;
@@ -18,48 +18,72 @@ const PLANS = [
     name: 'Free',
     price: 0,
     period: '',
-    features: ['10 dictations/month', 'Basic transcription', '3 document modes (General, Email, Notes)', 'Copy to clipboard'],
+    features: [
+      'Voice compose — speak, get formatted text',
+      'Real-time streaming transcription',
+      'Voice search across dictations',
+      '12 document mode AI enhancement',
+      'Legal & accounting vocabulary (5,000+ terms)',
+      'Export to .docx',
+      'Voice commands (punctuation, paragraphs)',
+    ],
     cta: 'Current Plan',
     highlight: false,
   },
   {
-    id: 'pro' as PlanId,
-    name: 'Professional',
-    price: 29,
+    id: 'personal' as PlanId,
+    name: 'Personal',
+    price: 9,
     period: '/month',
     features: [
-      '500 dictations/month',
-      'All 12 document modes',
-      'Custom vocabulary',
-      'Priority Whisper processing',
-      'Export to .docx',
-      'Firm profile',
+      'Everything in Free, plus:',
+      'Voice replies — speak in your tone',
+      'Morning briefing — spoken inbox summary',
+      'Voice notes on any document',
+      'Text-to-speech read-aloud',
+      'Multiple TTS voice options',
+      'Audio playback of recordings',
+    ],
+    cta: 'Upgrade to Personal',
+    highlight: true,
+  },
+  {
+    id: 'pro' as PlanId,
+    name: 'Pro',
+    price: 19,
+    period: '/month',
+    features: [
+      'Everything in Personal, plus:',
+      'Real-time voice translation (35+ languages)',
+      'Voice cloning — AI speaks in your voice',
+      'Voice commands — control everything by speaking',
+      'Meeting mode — speaker diarization',
+      'Sentiment analysis — detect tone and mood',
+      'Premium TTS voices',
+      'Batch file transcription',
       'Document templates',
-      'Auto-detect document type',
-      'Audio playback',
-      'Batch file upload',
     ],
     cta: 'Upgrade to Pro',
-    highlight: true,
+    highlight: false,
   },
   {
     id: 'enterprise' as PlanId,
     name: 'Enterprise',
-    price: 99,
-    period: '/month',
+    price: -1,
+    period: '',
     features: [
-      'Unlimited dictations',
-      'All Professional features',
-      'Multi-user access',
-      'Team vocabulary sharing',
+      'Everything in Pro, plus:',
+      'Voiceprint biometric authentication',
+      'Call-to-email bridge',
+      'Team voice channels',
       'SSO (Google, Microsoft)',
+      'Custom voice model training',
       'Admin dashboard & analytics',
       'White-label branding',
-      'Custom domain',
-      'Priority support',
-      'API access',
+      'SOC 2 / HIPAA compliance',
+      'Dedicated account manager',
     ],
-    cta: 'Upgrade to Enterprise',
+    cta: 'Contact Sales',
     highlight: false,
   },
 ];
@@ -181,8 +205,8 @@ export default function BillingPage() {
 
           {/* Loading skeleton */}
           {initialLoading ? (
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              {[0, 1, 2].map(i => (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+              {[0, 1, 2, 3].map(i => (
                 <div key={i} className="rounded-xl border border-ink-800/50 bg-ink-900/40 p-5 flex flex-col animate-pulse">
                   <div className="h-5 w-24 bg-ink-800 rounded mb-4" />
                   <div className="h-9 w-20 bg-ink-800 rounded mb-6" />
@@ -211,13 +235,11 @@ export default function BillingPage() {
               )}
 
               {/* Plan cards */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                 {PLANS.map(plan => {
                   const isCurrent = plan.id === currentPlan;
-                  const isDowngrade = (
-                    (currentPlan === 'enterprise' && plan.id !== 'enterprise') ||
-                    (currentPlan === 'pro' && plan.id === 'free')
-                  );
+                  const tierRank: Record<PlanId, number> = { free: 0, personal: 1, pro: 2, enterprise: 3 };
+                  const isDowngrade = tierRank[plan.id] < tierRank[currentPlan];
 
                   return (
                     <div
@@ -245,7 +267,7 @@ export default function BillingPage() {
                       <h3 className="text-lg font-display text-ink-50">{plan.name}</h3>
                       <div className="mt-2 mb-4">
                         <span className={`text-3xl font-display ${isCurrent ? 'text-gold-400' : 'text-ink-100'}`}>
-                          ${plan.price}
+                          {plan.price === -1 ? 'Custom' : `$${plan.price}`}
                         </span>
                         <span className="text-ink-500 text-sm">{plan.period}</span>
                       </div>

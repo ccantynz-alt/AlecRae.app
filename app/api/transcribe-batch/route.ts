@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import OpenAI from 'openai';
 import { verifySession } from '@/lib/auth';
 import { rateLimiters } from '@/lib/rate-limit';
+import { isVoxlenConfigured, transcribe as voxlenTranscribe } from '@/lib/voxlen';
 
 export const maxDuration = 300; // 5 minutes for batch processing
 
@@ -9,6 +10,7 @@ interface TranscriptionResult {
   filename: string;
   text: string;
   duration: number | undefined;
+  engine?: string;
   error?: string;
 }
 
@@ -38,7 +40,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+    const useVoxlen = isVoxlenConfigured();
 
     const vocabHint = customVocab
       ? `Legal and accounting dictation. Key terms: ${customVocab}`
@@ -58,6 +60,7 @@ export async function POST(request: NextRequest) {
               `data: ${JSON.stringify({
                 type: 'start',
                 total: files.length,
+                engine: useVoxlen ? 'voxlen' : 'whisper',
               })}\n\n`
             )
           );
@@ -79,18 +82,51 @@ export async function POST(request: NextRequest) {
             );
 
             try {
-              const transcription = await openai.audio.transcriptions.create({
-                file: file,
-                model: 'whisper-1',
-                language: 'en',
-                response_format: 'verbose_json',
-                prompt: vocabHint,
-              });
+              let text = '';
+              let duration: number | undefined;
+              let engine = 'whisper';
+
+              if (useVoxlen) {
+                try {
+                  const result = await voxlenTranscribe(file, {
+                    language: 'en',
+                    vocabulary: vocabHint,
+                  });
+                  text = result.text;
+                  duration = result.duration;
+                  engine = 'voxlen';
+                } catch (voxlenErr: unknown) {
+                  // Fall back to Whisper for this file
+                  console.warn(`Voxlen batch failed for ${file.name}, falling back to Whisper:`, voxlenErr);
+                  const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+                  const transcription = await openai.audio.transcriptions.create({
+                    file: file,
+                    model: 'whisper-1',
+                    language: 'en',
+                    response_format: 'verbose_json',
+                    prompt: vocabHint,
+                  });
+                  text = transcription.text;
+                  duration = transcription.duration;
+                }
+              } else {
+                const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+                const transcription = await openai.audio.transcriptions.create({
+                  file: file,
+                  model: 'whisper-1',
+                  language: 'en',
+                  response_format: 'verbose_json',
+                  prompt: vocabHint,
+                });
+                text = transcription.text;
+                duration = transcription.duration;
+              }
 
               const result: TranscriptionResult = {
                 filename: file.name,
-                text: transcription.text,
-                duration: transcription.duration,
+                text,
+                duration,
+                engine,
               };
 
               results.push(result);

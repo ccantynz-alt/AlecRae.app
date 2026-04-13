@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import OpenAI from 'openai';
 import { rateLimiters } from '@/lib/rate-limit';
 import { getVocabularyForMode } from '@/lib/legal-vocabulary';
+import { isVoxlenConfigured, transcribe as voxlenTranscribe } from '@/lib/voxlen';
 
 const VOCAB_CHAR_LIMIT = 800;
 
@@ -54,10 +55,31 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'No audio file provided' }, { status: 400 });
     }
 
-    const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
-
-    // Build vocabulary prompt for Whisper — combines built-in legal/accounting terms with user custom terms
     const vocabHint = buildVocabPrompt(customVocab, mode);
+
+    // --- Voxlen STT (primary) with Whisper fallback ---
+    if (isVoxlenConfigured()) {
+      try {
+        const result = await voxlenTranscribe(audioFile, {
+          language: 'en',
+          vocabulary: vocabHint,
+          mode: mode || undefined,
+        });
+
+        return NextResponse.json({
+          text: result.text,
+          duration: result.duration,
+          confidence: result.confidence,
+          engine: 'voxlen',
+        });
+      } catch (voxlenErr: unknown) {
+        // Voxlen failed — fall through to Whisper
+        console.warn('Voxlen transcription failed, falling back to Whisper:', voxlenErr);
+      }
+    }
+
+    // --- Whisper fallback ---
+    const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
     const transcription = await openai.audio.transcriptions.create({
       file: audioFile,
@@ -70,6 +92,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       text: transcription.text,
       duration: transcription.duration,
+      engine: 'whisper',
     });
   } catch (error: unknown) {
     console.error('Transcription error:', error);

@@ -22,7 +22,7 @@
 
 ## LIVE BUILD CHECKLIST
 
-> **Last updated:** 2026-04-04
+> **Last updated:** 2026-04-13
 > Check this FIRST to know what's done and what needs building next.
 
 ### Core Dictation (COMPLETE)
@@ -72,6 +72,29 @@
 - [x] Button shimmer effect, premium mode selector dropdown
 - [x] Admin dashboard polish — SVG icons on stat cards, pill-style tab navigation, backdrop blur header
 - [x] Billing page polish — hover lift on cards, gold glow on current plan, credit card icon
+
+### Voxlen Voice Engine Integration (COMPLETE — April 2026)
+- [x] Voxlen API client library (lib/voxlen.ts) — full client for all 13 Voxlen endpoints
+- [x] Voxlen tier/feature gating system (lib/voxlen-tiers.ts) — Free/Personal/Pro/Enterprise
+- [x] Voxlen STT replaces Whisper as primary transcription (with automatic Whisper fallback)
+- [x] All 3 transcription routes updated: /api/transcribe, /api/transcribe-stream, /api/transcribe-batch
+- [x] TTS synthesis route (/api/voxlen/synthesize) — text-to-speech read-aloud (Personal+)
+- [x] Voice translation route (/api/voxlen/translate) — 35+ language support (Pro+)
+- [x] Voice cloning routes (/api/voxlen/clone/enroll, /api/voxlen/clone/synthesize) — 30s enrollment (Pro+)
+- [x] Sentiment analysis route (/api/voxlen/sentiment) — tone/mood detection (Pro+)
+- [x] Voiceprint auth routes (/api/voxlen/voiceprint/enroll, /api/voxlen/voiceprint/verify) — biometric auth (Enterprise)
+- [x] Speaker diarization route (/api/voxlen/diarize) — meeting mode who-said-what (Pro+)
+- [x] Voxlen status endpoint (/api/voxlen/status) — engine status, tier features, voices, languages
+- [x] Voxlen rate limiters (synth: 15/min, translate: 10/min, clone: 3/min, sentiment: 20/min, voiceprint: 5/min, diarize: 5/min)
+- [x] Middleware updated to protect all /api/voxlen/* routes
+- [x] Billing page updated to 4-tier pricing (Free $0, Personal $9, Pro $19, Enterprise custom)
+- [x] Billing status route includes voxlenConfigured flag
+- [x] UI: Voxlen panel in sidebar (engine status, TTS controls, sentiment, translation, feature list)
+- [x] UI: Read-aloud button on enhanced text panel (TTS via Voxlen)
+- [x] UI: Sentiment mood badge on enhanced panel header
+- [x] UI: Engine-aware transcription status text (Voxlen/Whisper)
+- [x] Consent-enforced voice cloning (explicit consent required)
+- [x] Anti-spoofing logging for voiceprint verification attempts
 
 ### Phase 2 — Database (Neon PostgreSQL) — NOT STARTED
 - [ ] Set DATABASE_URL env var on Vercel
@@ -170,7 +193,8 @@ Long-term, this tool may be rebranded as **MarcoReid Voice** when the brand arch
 - **Framework:** Next.js 14 (App Router)
 - **Language:** TypeScript
 - **Styling:** Tailwind CSS
-- **Transcription:** OpenAI Whisper API (whisper-1)
+- **Voice Engine:** Voxlen (primary — STT, TTS, translation, cloning, sentiment, diarization, voiceprint)
+- **Transcription Fallback:** OpenAI Whisper API (whisper-1) — used when VOXLEN_API_KEY not set
 - **AI Enhancement:** Claude API (claude-sonnet-4-20250514) with streaming + extended thinking
 - **Auth:** JWT sessions via jose library, admin password gated + multi-user scaffolded
 - **Export:** docx library for Word document generation
@@ -193,7 +217,7 @@ app/
   app/
     page.tsx                        — Main dictation interface (protected, 1255 lines)
     admin/page.tsx                  — Admin dashboard (overview, users, firms)
-    billing/page.tsx                — Subscription billing page (Free/Pro/Enterprise)
+    billing/page.tsx                — Subscription billing page (Free/Personal/Pro/Enterprise)
     layout.tsx                      — App layout wrapper
   api/
     auth/route.ts                   — POST login, DELETE logout
@@ -201,14 +225,23 @@ app/
     auth/register/route.ts          — User registration
     auth/sso/[provider]/route.ts    — SSO redirect
     auth/sso/[provider]/callback/   — SSO callback
-    transcribe/route.ts             — Whisper transcription with vocab hints
-    transcribe-stream/route.ts      — Streaming transcription via SSE
+    transcribe/route.ts             — Voxlen/Whisper transcription with vocab hints
+    transcribe-stream/route.ts      — Streaming transcription via SSE (Voxlen primary)
     transcribe-batch/route.ts       — Batch file transcription (up to 20 files)
     enhance/route.ts                — Claude streaming enhancement + extended thinking
-    billing/status/route.ts         — Current subscription plan status
+    billing/status/route.ts         — Current subscription plan status + voxlenConfigured
     billing/checkout/route.ts       — Stripe checkout session
     billing/portal/route.ts         — Stripe customer portal
     billing/webhook/route.ts        — Stripe webhook handler
+    voxlen/status/route.ts          — Voxlen engine status, tier features, voices, languages
+    voxlen/synthesize/route.ts      — Text-to-speech via Voxlen (Personal+)
+    voxlen/translate/route.ts       — Voice translation 35+ languages (Pro+)
+    voxlen/clone/enroll/route.ts    — Voice cloning enrollment 30s sample (Pro+)
+    voxlen/clone/synthesize/route.ts — Cloned voice synthesis (Pro+)
+    voxlen/sentiment/route.ts       — Audio sentiment/tone analysis (Pro+)
+    voxlen/voiceprint/enroll/route.ts — Voiceprint biometric enrollment (Enterprise)
+    voxlen/voiceprint/verify/route.ts — Voiceprint biometric verification (Enterprise)
+    voxlen/diarize/route.ts         — Speaker diarization for meetings (Pro+)
     dictations/route.ts             — Save/fetch dictation history
     dictations/[id]/route.ts        — Individual dictation CRUD
     vocabulary/route.ts             — Custom vocabulary CRUD
@@ -233,11 +266,13 @@ lib/
   firm-store.ts                     — In-memory firm store (globalThis singleton)
   audio-store.ts                    — In-memory audio store (globalThis singleton)
   get-user.ts                       — User resolution from session
-  rate-limit.ts                     — Sliding window rate limiter (per-IP)
+  rate-limit.ts                     — Sliding window rate limiter (per-IP, incl. Voxlen routes)
   sso.ts                            — Google + Microsoft OAuth2
   stripe.ts                         — Stripe integration (checkout, portal, webhooks)
   templates.ts                      — 12 document mode system prompts + vocabulary
   templates-fillable.ts             — 6 fillable document templates with fields
+  voxlen.ts                         — Voxlen voice engine API client (all 13 endpoints)
+  voxlen-tiers.ts                   — Voxlen feature tier gating (Free/Personal/Pro/Enterprise)
   whitelabel.ts                     — White-label branding config
 middleware.ts                       — Route protection (JWT cookie check)
 public/
@@ -288,10 +323,13 @@ public/
 ## ENVIRONMENT VARIABLES (Vercel)
 
 ```
-OPENAI_API_KEY          — OpenAI API key for Whisper (REQUIRED)
+OPENAI_API_KEY          — OpenAI API key for Whisper fallback (REQUIRED until Voxlen is primary)
 ANTHROPIC_API_KEY       — Anthropic API key for Claude (REQUIRED)
 ADMIN_PASSWORD          — Admin login password (REQUIRED)
 JWT_SECRET              — Random string for signing session tokens, 32+ chars (REQUIRED)
+VOXLEN_API_KEY          — Voxlen voice engine API key (OPTIONAL — falls back to Whisper without it)
+VOXLEN_API_URL          — Voxlen API base URL, defaults to https://api.voxlen.io/v1 (OPTIONAL)
+VOXLEN_WS_URL           — Voxlen WebSocket URL, defaults to wss://api.voxlen.io/v1 (OPTIONAL)
 DATABASE_URL            — Neon PostgreSQL connection string (OPTIONAL — app works without it)
 STRIPE_SECRET_KEY       — Stripe API key (OPTIONAL — billing disabled without it)
 STRIPE_WEBHOOK_SECRET   — Stripe webhook signing secret (OPTIONAL)

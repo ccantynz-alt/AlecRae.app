@@ -7,7 +7,7 @@ import { useBranding } from '@/lib/BrandingContext';
 
 // === Types ===
 type DocMode = 'general' | 'legal-letter' | 'legal-memo' | 'court-filing' | 'demand-letter' | 'deposition-summary' | 'engagement-letter' | 'accounting-report' | 'tax-advisory' | 'audit-opinion' | 'client-email' | 'meeting-notes';
-type Panel = 'none' | 'settings' | 'vocabulary' | 'hotkeys' | 'history' | 'templates';
+type Panel = 'none' | 'settings' | 'vocabulary' | 'hotkeys' | 'history' | 'templates' | 'voxlen';
 
 interface BatchFileStatus {
   filename: string;
@@ -118,6 +118,21 @@ export default function DictationApp() {
   const audioElementRef = useRef<HTMLAudioElement | null>(null);
   const lastRecordedAudioRef = useRef<{ base64: string; mimeType: string } | null>(null);
 
+  // Voxlen voice engine state
+  const [voxlenStatus, setVoxlenStatus] = useState<{
+    configured: boolean;
+    engine: string;
+    tier: string;
+    features: string[];
+  } | null>(null);
+  const [isTTSPlaying, setIsTTSPlaying] = useState(false);
+  const [ttsVoice, setTtsVoice] = useState('professional-1');
+  const [sentimentResult, setSentimentResult] = useState<{ overall: string; confidence: number } | null>(null);
+  const [translateTarget, setTranslateTarget] = useState('');
+  const [isTranslating, setIsTranslating] = useState(false);
+  const [translatedText, setTranslatedText] = useState('');
+  const ttsAudioRef = useRef<HTMLAudioElement | null>(null);
+
   // Refs
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
@@ -132,6 +147,15 @@ export default function DictationApp() {
     setHistory(loadJSON('av_history', []));
     setRecordMode(loadJSON('av_record_mode', 'toggle'));
     setMode(loadJSON('av_last_mode', 'general'));
+    setTtsVoice(loadJSON('av_tts_voice', 'professional-1'));
+  }, []);
+
+  // Fetch Voxlen engine status on mount
+  useEffect(() => {
+    fetch('/api/voxlen/status')
+      .then(res => res.ok ? res.json() : null)
+      .then(data => { if (data) setVoxlenStatus(data); })
+      .catch(() => {});
   }, []);
 
   // Save settings
@@ -646,6 +670,107 @@ export default function DictationApp() {
     window.location.href = '/';
   };
 
+  // === Voxlen Voice Engine Actions ===
+  const hasVoxlenFeature = (feature: string) => voxlenStatus?.features?.includes(feature) ?? false;
+
+  const handleTTSReadAloud = async () => {
+    const text = enhancedText || rawText;
+    if (!text.trim() || !hasVoxlenFeature('tts')) return;
+
+    // If already playing, stop
+    if (isTTSPlaying && ttsAudioRef.current) {
+      ttsAudioRef.current.pause();
+      ttsAudioRef.current = null;
+      setIsTTSPlaying(false);
+      return;
+    }
+
+    setIsTTSPlaying(true);
+    try {
+      const res = await fetch('/api/voxlen/synthesize', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text: text.slice(0, 5000), voice: ttsVoice }),
+      });
+      if (!res.ok) throw new Error('TTS failed');
+      const data = await res.json();
+
+      const audio = new Audio(`data:audio/mp3;base64,${data.audio}`);
+      ttsAudioRef.current = audio;
+      audio.addEventListener('ended', () => {
+        setIsTTSPlaying(false);
+        ttsAudioRef.current = null;
+      });
+      await audio.play();
+    } catch (err: any) {
+      setError(err.message || 'Text-to-speech failed');
+      setIsTTSPlaying(false);
+    }
+  };
+
+  const handleSentimentAnalysis = async () => {
+    if (!hasVoxlenFeature('sentiment') || !lastRecordedAudioRef.current) return;
+    try {
+      const base64 = lastRecordedAudioRef.current.base64;
+      const mimeType = lastRecordedAudioRef.current.mimeType;
+      // Convert data URI to blob
+      const byteString = atob(base64.split(',')[1] || base64);
+      const bytes = new Uint8Array(byteString.length);
+      for (let i = 0; i < byteString.length; i++) bytes[i] = byteString.charCodeAt(i);
+      const blob = new Blob([bytes], { type: mimeType });
+
+      const formData = new FormData();
+      formData.append('audio', new File([blob], 'recording.webm', { type: mimeType }));
+
+      const res = await fetch('/api/voxlen/sentiment', { method: 'POST', body: formData });
+      if (!res.ok) throw new Error('Sentiment analysis failed');
+      const data = await res.json();
+      setSentimentResult({ overall: data.overall, confidence: data.confidence });
+      // Auto-clear after 10 seconds
+      setTimeout(() => setSentimentResult(null), 10000);
+    } catch (err: any) {
+      setError(err.message || 'Sentiment analysis failed');
+    }
+  };
+
+  const handleTranslate = async () => {
+    const text = enhancedText || rawText;
+    if (!text.trim() || !translateTarget || !hasVoxlenFeature('translation')) return;
+    setIsTranslating(true);
+    setTranslatedText('');
+    try {
+      const res = await fetch('/api/voxlen/translate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          audio_base64: '', // Text-based translation placeholder
+          target_language: translateTarget,
+          output_mode: 'text',
+        }),
+      });
+      if (!res.ok) throw new Error('Translation failed');
+      const data = await res.json();
+      setTranslatedText(data.translatedText);
+    } catch (err: any) {
+      setError(err.message || 'Translation failed');
+    } finally {
+      setIsTranslating(false);
+    }
+  };
+
+  // Save TTS voice preference
+  useEffect(() => { saveJSON('av_tts_voice', ttsVoice); }, [ttsVoice]);
+
+  // Cleanup TTS on unmount
+  useEffect(() => {
+    return () => {
+      if (ttsAudioRef.current) {
+        ttsAudioRef.current.pause();
+        ttsAudioRef.current = null;
+      }
+    };
+  }, []);
+
   // === Template Actions ===
   const selectTemplate = (template: DocumentTemplate) => {
     setSelectedTemplate(template);
@@ -761,7 +886,7 @@ export default function DictationApp() {
           )}
         </div>
         <div className="flex items-center gap-1">
-          {(['templates', 'vocabulary', 'hotkeys', 'history', 'settings'] as Panel[]).map(p => (
+          {(['templates', 'vocabulary', 'hotkeys', 'history', 'voxlen', 'settings'] as Panel[]).map(p => (
             <button
               key={p}
               onClick={() => setActivePanel(activePanel === p ? 'none' : p)}
@@ -887,7 +1012,7 @@ export default function DictationApp() {
             {activePanel === 'vocabulary' && (
               <div>
                 <h2 className="text-sm font-medium text-ink-200 mb-3">Custom vocabulary</h2>
-                <p className="text-xs text-ink-500 mb-3">Terms fed to Whisper for better accuracy</p>
+                <p className="text-xs text-ink-500 mb-3">Terms fed to {voxlenStatus?.configured ? 'Voxlen' : 'Whisper'} for better accuracy</p>
                 <div className="flex gap-2 mb-3">
                   <input
                     value={newWord}
@@ -1100,6 +1225,156 @@ export default function DictationApp() {
                 </button>
               </div>
             )}
+
+            {/* Voxlen Voice Engine Panel */}
+            {activePanel === 'voxlen' && (
+              <div className="space-y-5">
+                <div>
+                  <h2 className="text-sm font-medium text-ink-200 mb-1">Voxlen Voice Engine</h2>
+                  <p className="text-xs text-ink-500 mb-3">
+                    {voxlenStatus?.configured
+                      ? <span className="text-emerald-400">Connected</span>
+                      : <span className="text-ink-500">Not configured — using Whisper fallback</span>
+                    }
+                  </p>
+                  <div className="bg-ink-800/50 rounded-lg px-3 py-2 text-[11px] text-ink-400">
+                    <p>Engine: <span className="text-ink-200">{voxlenStatus?.engine || 'whisper-fallback'}</span></p>
+                    <p>Tier: <span className="text-gold-400 capitalize">{voxlenStatus?.tier || 'free'}</span></p>
+                  </div>
+                </div>
+
+                {/* Text-to-Speech */}
+                <div>
+                  <label className="text-xs text-ink-400 block mb-1.5">Text-to-speech voice</label>
+                  <select
+                    value={ttsVoice}
+                    onChange={e => setTtsVoice(e.target.value)}
+                    disabled={!hasVoxlenFeature('tts')}
+                    className="w-full bg-ink-800 border border-ink-700/50 rounded-lg px-3 py-1.5 text-sm text-ink-200 focus:border-gold-500/50 disabled:opacity-50"
+                  >
+                    <option value="professional-1">Professional (Female)</option>
+                    <option value="professional-2">Professional (Male)</option>
+                    <option value="warm-1">Warm (Female)</option>
+                    <option value="warm-2">Warm (Male)</option>
+                    <option value="authoritative-1">Authoritative (Female)</option>
+                    <option value="authoritative-2">Authoritative (Male)</option>
+                    <option value="calm-1">Calm (Female)</option>
+                    <option value="calm-2">Calm (Male)</option>
+                  </select>
+                  <button
+                    onClick={handleTTSReadAloud}
+                    disabled={!hasVoxlenFeature('tts') || (!enhancedText && !rawText)}
+                    className={`w-full mt-2 py-2 rounded-lg text-xs font-medium transition-all ${
+                      isTTSPlaying
+                        ? 'bg-red-500/20 text-red-300 border border-red-500/30'
+                        : hasVoxlenFeature('tts') && (enhancedText || rawText)
+                        ? 'bg-gold-500/20 text-gold-400 border border-gold-500/30 hover:bg-gold-500/30'
+                        : 'bg-ink-800/50 text-ink-600 cursor-not-allowed'
+                    }`}
+                  >
+                    {isTTSPlaying ? 'Stop reading' : 'Read aloud'}
+                  </button>
+                  {!hasVoxlenFeature('tts') && (
+                    <p className="text-[10px] text-ink-600 mt-1">Requires Personal plan or higher</p>
+                  )}
+                </div>
+
+                {/* Sentiment Analysis */}
+                <div>
+                  <label className="text-xs text-ink-400 block mb-1.5">Sentiment analysis</label>
+                  <button
+                    onClick={handleSentimentAnalysis}
+                    disabled={!hasVoxlenFeature('sentiment') || !lastRecordedAudioRef.current}
+                    className={`w-full py-2 rounded-lg text-xs font-medium transition-all ${
+                      hasVoxlenFeature('sentiment') && lastRecordedAudioRef.current
+                        ? 'bg-ink-800 text-ink-200 hover:bg-ink-700'
+                        : 'bg-ink-800/50 text-ink-600 cursor-not-allowed'
+                    }`}
+                  >
+                    Analyse recording tone
+                  </button>
+                  {sentimentResult && (
+                    <div className="mt-2 bg-ink-800/50 rounded-lg px-3 py-2 text-xs">
+                      <span className={`inline-block px-2 py-0.5 rounded-full font-medium capitalize ${
+                        sentimentResult.overall === 'urgent' ? 'bg-red-500/20 text-red-300' :
+                        sentimentResult.overall === 'frustrated' ? 'bg-orange-500/20 text-orange-300' :
+                        sentimentResult.overall === 'happy' ? 'bg-emerald-500/20 text-emerald-300' :
+                        sentimentResult.overall === 'stressed' ? 'bg-amber-500/20 text-amber-300' :
+                        sentimentResult.overall === 'professional' ? 'bg-blue-500/20 text-blue-300' :
+                        'bg-ink-700 text-ink-300'
+                      }`}>
+                        {sentimentResult.overall}
+                      </span>
+                      <span className="ml-2 text-ink-500">{Math.round(sentimentResult.confidence * 100)}%</span>
+                    </div>
+                  )}
+                  {!hasVoxlenFeature('sentiment') && (
+                    <p className="text-[10px] text-ink-600 mt-1">Requires Pro plan or higher</p>
+                  )}
+                </div>
+
+                {/* Translation */}
+                <div>
+                  <label className="text-xs text-ink-400 block mb-1.5">Voice translation</label>
+                  <select
+                    value={translateTarget}
+                    onChange={e => setTranslateTarget(e.target.value)}
+                    disabled={!hasVoxlenFeature('translation')}
+                    className="w-full bg-ink-800 border border-ink-700/50 rounded-lg px-3 py-1.5 text-sm text-ink-200 focus:border-gold-500/50 disabled:opacity-50"
+                  >
+                    <option value="">Select language...</option>
+                    <option value="es">Spanish</option>
+                    <option value="fr">French</option>
+                    <option value="de">German</option>
+                    <option value="it">Italian</option>
+                    <option value="pt">Portuguese</option>
+                    <option value="ja">Japanese</option>
+                    <option value="ko">Korean</option>
+                    <option value="zh">Chinese (Mandarin)</option>
+                    <option value="ar">Arabic</option>
+                    <option value="ru">Russian</option>
+                    <option value="hi">Hindi</option>
+                    <option value="nl">Dutch</option>
+                    <option value="sv">Swedish</option>
+                    <option value="pl">Polish</option>
+                    <option value="tr">Turkish</option>
+                  </select>
+                  {!hasVoxlenFeature('translation') && (
+                    <p className="text-[10px] text-ink-600 mt-1">Requires Pro plan or higher</p>
+                  )}
+                </div>
+
+                {/* Available Features List */}
+                <div>
+                  <label className="text-xs text-ink-400 block mb-1.5">Available features</label>
+                  <div className="space-y-1">
+                    {[
+                      { id: 'stt', label: 'Speech-to-text', tier: 'Free' },
+                      { id: 'voice-search', label: 'Voice search', tier: 'Free' },
+                      { id: 'tts', label: 'Text-to-speech', tier: 'Personal' },
+                      { id: 'voice-replies', label: 'Voice replies', tier: 'Personal' },
+                      { id: 'voice-notes', label: 'Voice notes', tier: 'Personal' },
+                      { id: 'translation', label: 'Translation (35+ langs)', tier: 'Pro' },
+                      { id: 'voice-cloning', label: 'Voice cloning', tier: 'Pro' },
+                      { id: 'diarization', label: 'Meeting mode', tier: 'Pro' },
+                      { id: 'sentiment', label: 'Sentiment analysis', tier: 'Pro' },
+                      { id: 'voiceprint-auth', label: 'Voiceprint auth', tier: 'Enterprise' },
+                    ].map(f => (
+                      <div key={f.id} className="flex items-center justify-between text-[11px]">
+                        <span className={hasVoxlenFeature(f.id) ? 'text-ink-200' : 'text-ink-600'}>{f.label}</span>
+                        <span className={`px-1.5 py-0.5 rounded text-[10px] ${
+                          hasVoxlenFeature(f.id)
+                            ? 'bg-emerald-500/20 text-emerald-400'
+                            : 'bg-ink-800 text-ink-500'
+                        }`}>
+                          {hasVoxlenFeature(f.id) ? 'Active' : f.tier}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
           </aside>
         )}
 
@@ -1155,7 +1430,7 @@ export default function DictationApp() {
                   </p>
                 </div>
               ) : isTranscribing ? (
-                <p className="text-gold-400 text-sm">Transcribing with Whisper...</p>
+                <p className="text-gold-400 text-sm">Transcribing with {voxlenStatus?.configured ? 'Voxlen' : 'Whisper'}...</p>
               ) : (
                 <div>
                   <p className="text-ink-300 text-sm">Tap to start dictating</p>
@@ -1274,6 +1549,28 @@ export default function DictationApp() {
                   Enhanced {isEnhancing && <span className="stream-cursor" />}
                 </span>
                 <div className="flex items-center gap-2">
+                  {sentimentResult && (
+                    <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium capitalize ${
+                      sentimentResult.overall === 'urgent' ? 'bg-red-500/20 text-red-300' :
+                      sentimentResult.overall === 'frustrated' ? 'bg-orange-500/20 text-orange-300' :
+                      sentimentResult.overall === 'happy' ? 'bg-emerald-500/20 text-emerald-300' :
+                      sentimentResult.overall === 'professional' ? 'bg-blue-500/20 text-blue-300' :
+                      'bg-ink-700 text-ink-300'
+                    }`}>
+                      {sentimentResult.overall}
+                    </span>
+                  )}
+                  {hasVoxlenFeature('tts') && (enhancedText || rawText) && (
+                    <button
+                      onClick={handleTTSReadAloud}
+                      className={`text-[11px] transition-colors ${
+                        isTTSPlaying ? 'text-red-400 hover:text-red-300' : 'text-ink-500 hover:text-gold-400'
+                      }`}
+                      title={isTTSPlaying ? 'Stop reading' : 'Read aloud with Voxlen'}
+                    >
+                      {isTTSPlaying ? 'Stop' : 'Read aloud'}
+                    </button>
+                  )}
                   {enhancedText && (
                     <>
                       <button onClick={() => copyToClipboard(enhancedText, 'enhanced')} className="text-[11px] text-ink-500 hover:text-ink-200">

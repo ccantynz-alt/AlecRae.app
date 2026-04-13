@@ -20,7 +20,7 @@ export async function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
-  if (pathname.startsWith('/app') || pathname.startsWith('/api/transcribe') || pathname.startsWith('/api/enhance') || pathname.startsWith('/api/dictations') || pathname.startsWith('/api/vocabulary') || pathname.startsWith('/api/settings') || pathname.startsWith('/api/analytics') || pathname.startsWith('/api/firms') || pathname.startsWith('/api/audio') || pathname.startsWith('/api/billing') || pathname.startsWith('/api/admin') || pathname.startsWith('/api/users') || pathname.startsWith('/api/whitelabel')) {
+  if (pathname.startsWith('/app') || pathname.startsWith('/api/transcribe') || pathname.startsWith('/api/enhance') || pathname.startsWith('/api/dictations') || pathname.startsWith('/api/vocabulary') || pathname.startsWith('/api/settings') || pathname.startsWith('/api/analytics') || pathname.startsWith('/api/firms') || pathname.startsWith('/api/audio') || pathname.startsWith('/api/billing') || pathname.startsWith('/api/admin') || pathname.startsWith('/api/users') || pathname.startsWith('/api/whitelabel') || pathname.startsWith('/api/voxlen')) {
     const session = request.cookies.get('alecrae_session')?.value;
     if (!session) {
       if (pathname.startsWith('/api/')) {
@@ -44,5 +44,5 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ['/app/:path*', '/api/transcribe/:path*', '/api/transcribe-stream/:path*', '/api/transcribe-batch/:path*', '/api/enhance/:path*', '/api/dictations/:path*', '/api/vocabulary/:path*', '/api/settings/:path*', '/api/analytics/:path*', '/api/db/:path*', '/api/firms/:path*', '/api/audio/:path*', '/api/billing/:path*', '/api/admin/:path*', '/api/users/:path*', '/api/whitelabel/:path*'],
+  matcher: ['/app/:path*', '/api/transcribe/:path*', '/api/transcribe-stream/:path*', '/api/transcribe-batch/:path*', '/api/enhance/:path*', '/api/dictations/:path*', '/api/vocabulary/:path*', '/api/settings/:path*', '/api/analytics/:path*', '/api/db/:path*', '/api/firms/:path*', '/api/audio/:path*', '/api/billing/:path*', '/api/admin/:path*', '/api/users/:path*', '/api/whitelabel/:path*', '/api/voxlen/:path*'],
 };

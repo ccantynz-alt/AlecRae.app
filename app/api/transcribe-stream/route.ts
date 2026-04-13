@@ -3,6 +3,7 @@ import OpenAI from 'openai';
 import { verifySession } from '@/lib/auth';
 import { rateLimiters } from '@/lib/rate-limit';
 import { getVocabularyForMode } from '@/lib/legal-vocabulary';
+import { isVoxlenConfigured, transcribe as voxlenTranscribe } from '@/lib/voxlen';
 
 const VOCAB_CHAR_LIMIT = 800;
 
@@ -62,11 +63,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'No audio file provided' }, { status: 400 });
     }
 
-    const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
-
-    // Build vocabulary prompt for Whisper — combines built-in legal/accounting terms with user custom terms
     const vocabHint = buildVocabPrompt(customVocab, mode);
-
+    const useVoxlen = isVoxlenConfigured();
     const encoder = new TextEncoder();
 
     const readableStream = new ReadableStream({
@@ -78,26 +76,59 @@ export async function POST(request: NextRequest) {
               `data: ${JSON.stringify({
                 type: 'start',
                 chunkIndex: chunkIndex ? parseInt(chunkIndex, 10) : 0,
+                engine: useVoxlen ? 'voxlen' : 'whisper',
               })}\n\n`
             )
           );
 
-          // Process audio through Whisper
-          const transcription = await openai.audio.transcriptions.create({
-            file: audioFile,
-            model: 'whisper-1',
-            language: 'en',
-            response_format: 'verbose_json',
-            prompt: vocabHint,
-          });
+          let text = '';
+          let duration: number | undefined;
+
+          if (useVoxlen) {
+            // --- Voxlen STT (primary) ---
+            try {
+              const result = await voxlenTranscribe(audioFile, {
+                language: 'en',
+                vocabulary: vocabHint,
+                mode: mode || undefined,
+              });
+              text = result.text;
+              duration = result.duration;
+            } catch (voxlenErr: unknown) {
+              // Fall back to Whisper
+              console.warn('Voxlen streaming chunk failed, falling back to Whisper:', voxlenErr);
+              const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+              const transcription = await openai.audio.transcriptions.create({
+                file: audioFile,
+                model: 'whisper-1',
+                language: 'en',
+                response_format: 'verbose_json',
+                prompt: vocabHint,
+              });
+              text = transcription.text;
+              duration = transcription.duration;
+            }
+          } else {
+            // --- Whisper fallback ---
+            const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+            const transcription = await openai.audio.transcriptions.create({
+              file: audioFile,
+              model: 'whisper-1',
+              language: 'en',
+              response_format: 'verbose_json',
+              prompt: vocabHint,
+            });
+            text = transcription.text;
+            duration = transcription.duration;
+          }
 
           // Send the partial transcription result
           controller.enqueue(
             encoder.encode(
               `data: ${JSON.stringify({
                 type: 'partial',
-                text: transcription.text,
-                duration: transcription.duration,
+                text,
+                duration,
                 chunkIndex: chunkIndex ? parseInt(chunkIndex, 10) : 0,
               })}\n\n`
             )
