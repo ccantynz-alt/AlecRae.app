@@ -3,3 +3,7 @@ export { default as MultiDocPanel } from './MultiDocPanel';
 export { CompliancePanel } from './CompliancePanel';
 export { default as RedactionPanel } from './RedactionPanel';
 export { DiarizationPanel } from './DiarizationPanel';
+export { default as PrecedentPanel } from './PrecedentPanel';
+export { EsignPanel } from './EsignPanel';
+export { ConflictPanel } from './ConflictPanel';
+export { MatterPanel } from './MatterPanel';
