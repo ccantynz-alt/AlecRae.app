@@ -7,3 +7,4 @@ export { default as PrecedentPanel } from './PrecedentPanel';
 export { EsignPanel } from './EsignPanel';
 export { ConflictPanel } from './ConflictPanel';
 export { MatterPanel } from './MatterPanel';
+export { SharePanel } from './SharePanel';

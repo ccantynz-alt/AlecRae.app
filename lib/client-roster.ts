@@ -10,7 +10,9 @@
  * signatures and return types will remain identical.
  */
 
-import { randomUUID } from 'crypto';
+function generateClientId(): string {
+  return `client_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+}
 
 /* -------------------------------------------------------------------------- */
 /*  Public types                                                              */
@@ -134,7 +136,7 @@ export function addClient(input: ClientInput): Client {
 
   const now = new Date().toISOString();
   const client: Client = {
-    id: randomUUID(),
+    id: generateClientId(),
     name: input.name.trim(),
     aliases: input.aliases?.map((a) => a.trim()).filter(Boolean),
     matterNumbers: input.matterNumbers?.map((m) => m.trim()).filter(Boolean),
