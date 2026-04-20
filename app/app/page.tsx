@@ -4,6 +4,12 @@ import { useState, useRef, useCallback, useEffect } from 'react';
 import { detectDocumentType } from '@/lib/auto-detect';
 import { BUILT_IN_TEMPLATES, fillTemplate, type DocumentTemplate } from '@/lib/templates-fillable';
 import { useBranding } from '@/lib/BrandingContext';
+import {
+  CitationPanel,
+  RedactionPanel,
+  CompliancePanel,
+  MultiDocPanel,
+} from '@/app/components/features';
 
 // === Types ===
 type DocMode = 'general' | 'legal-letter' | 'legal-memo' | 'court-filing' | 'demand-letter' | 'deposition-summary' | 'engagement-letter' | 'accounting-report' | 'tax-advisory' | 'audit-opinion' | 'client-email' | 'meeting-notes';
@@ -1293,6 +1299,24 @@ export default function DictationApp() {
               </div>
             </div>
           </div>
+
+          {/* Intelligence panels (Wave 5) */}
+          {(rawText || enhancedText) && (
+            <div className="shrink-0 space-y-3">
+              <CitationPanel text={enhancedText || rawText} />
+              <CompliancePanel text={enhancedText || rawText} mode={mode} />
+              <RedactionPanel
+                text={enhancedText || rawText}
+                onRedact={(redacted) => {
+                  if (enhancedText) setEnhancedText(redacted);
+                  else setRawText(redacted);
+                }}
+              />
+              {rawText && (
+                <MultiDocPanel rawText={rawText} customInstructions={customInstructions} />
+              )}
+            </div>
+          )}
 
           {/* Batch Transcription Panel */}
           {showBatchPanel && (

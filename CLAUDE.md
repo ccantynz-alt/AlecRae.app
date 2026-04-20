@@ -22,7 +22,7 @@
 
 ## LIVE BUILD CHECKLIST
 
-> **Last updated:** 2026-04-04
+> **Last updated:** 2026-04-20
 > Check this FIRST to know what's done and what needs building next.
 
 ### Core Dictation (COMPLETE)
@@ -63,6 +63,25 @@
 - [x] Pre-loaded legal/accounting vocabulary (5,000+ built-in terms across 15 categories, mode-specific selection)
 - [x] Audio playback of original recordings (base64 storage, play/pause, progress bar, 5MB cap)
 
+### Wave 5 — Launch Readiness + Killer Features (COMPLETE — 20 April 2026)
+- [x] **Citation Intelligence** — auto-detects NZ/UK/US/AU case law, neutral citations, law reports, statutes, and regulations with jurisdiction-badged chips, click-to-copy, and invalid-format flagging (`lib/citations.ts`, `app/api/citations`, `app/components/features/CitationPanel.tsx`)
+- [x] **Multi-Document Chain** — one dictation generates up to 4 document variants in parallel via SSE with per-card streaming, error isolation, and abort-all cancel (`lib/multi-doc.ts`, `app/api/multi-doc`, `app/components/features/MultiDocPanel.tsx`)
+- [x] **Redaction Copilot** — auto-detects PII (email, phone NZ/UK/US/AU, IRD/SSN/NINO/TFN, NZ bank/IBAN/Luhn-checked cards, addresses, DOB, amounts ≥$10k, titled names, NZ case numbers) with per-type toggles and one-click redact (`lib/redaction.ts`, `app/api/redact`, `app/components/features/RedactionPanel.tsx`)
+- [x] **Compliance Copilot** — mode-specific rule engine for UPL, privilege markers, court-filing formality, fee arrangements, Circular 230, AICPA independence, GAAP/IFRS citation, tax year specificity, materiality, limitation periods, vague urgency (`lib/compliance.ts`, `app/api/compliance`, `app/components/features/CompliancePanel.tsx`)
+- [x] Feature panels wired into main dictation UI (Intelligence section below Enhanced panel)
+- [x] Landing page (/ replaces login with marketing, hero, competitive comparison table, built-for-both-sides, pricing preview, final CTA)
+- [x] Terms of Service (/terms — attorney-grade, NZ governing law, 17 sections covering professional responsibility disclaimer, confidentiality, dispute resolution via AMINZ)
+- [x] Pricing (/pricing — Free/Pro/Enterprise tiers + FAQ covering data-training, HIPAA, cancellation, exports, multi-seat)
+- [x] About (/about — brand, mission, philosophy, MarcoReid hierarchy, tech stack, NZ-built)
+- [x] Contact (/contact — sales/support/legal channels, enterprise demo CTA, mailing address)
+- [x] Error boundary (`app/error.tsx`) — graceful recovery with try-again + support link + digest reference
+- [x] 404 page (`app/not-found.tsx`)
+- [x] Login moved to `/login` (dedicated route, JWT flow preserved, register/forgot flows intact)
+- [x] Footer component (product, company, legal links + copyright + brand hierarchy)
+- [x] Environment variable validation (`lib/env-check.ts`) — clean 503 on missing OPENAI/ANTHROPIC keys instead of crash
+- [x] API hardening (transcribe/enhance call `assertOpenAIKey`/`assertAnthropicKey`)
+- [x] Middleware updated to allow public access to /, /terms, /privacy, /pricing, /about, /contact, /login
+
 ### Wave 3 Features (COMPLETE — April 2026)
 - [x] Complete auth system — registration with password strength, forgot/reset password, premium login page
 - [x] In-memory user store fallback (works without DATABASE_URL)
@@ -86,6 +105,13 @@
 - [ ] Capacitor wrapper for Google Play Store
 - [ ] Native notification support
 - [ ] Background audio recording
+
+### Wave 6 — Moat Widening (PLANNED)
+- [ ] **Speaker Diarization** — Pyannote or Whisper-based, labels "Counsel:", "Witness:", timestamps (nobody in legal-AI has this dialled in)
+- [ ] **Conflict-of-Interest Guardian** — extract names from dictation, cross-reference firm client roster, real-time flag (requires DATABASE_URL)
+- [ ] **Precedent Match** — semantic search over firm's past dictations via pg_vector embeddings
+- [ ] **E-Signature Handoff** — DocuSign/Adobe Sign push after enhancement (API integration)
+- [ ] **Matter-Linked Billing** — tag dictation to matter/client, auto-export billable time to time-tracking software
 
 ### Phase 4 — Advanced Features — PARTIALLY DONE
 - [x] Real-time streaming transcription (Live mode)
