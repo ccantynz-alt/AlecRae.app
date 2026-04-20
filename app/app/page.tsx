@@ -9,6 +9,12 @@ import {
   RedactionPanel,
   CompliancePanel,
   MultiDocPanel,
+  DiarizationPanel,
+  PrecedentPanel,
+  ConflictPanel,
+  EsignPanel,
+  MatterPanel,
+  SharePanel,
 } from '@/app/components/features';
 
 // === Types ===
@@ -1300,11 +1306,12 @@ export default function DictationApp() {
             </div>
           </div>
 
-          {/* Intelligence panels (Wave 5) */}
+          {/* Intelligence panels (Wave 5 + Wave 6) */}
           {(rawText || enhancedText) && (
             <div className="shrink-0 space-y-3">
               <CitationPanel text={enhancedText || rawText} />
               <CompliancePanel text={enhancedText || rawText} mode={mode} />
+              <ConflictPanel text={enhancedText || rawText} />
               <RedactionPanel
                 text={enhancedText || rawText}
                 onRedact={(redacted) => {
@@ -1312,8 +1319,34 @@ export default function DictationApp() {
                   else setRawText(redacted);
                 }}
               />
+              <DiarizationPanel
+                text={enhancedText || rawText}
+                onRelabel={(labeled) => {
+                  if (enhancedText) setEnhancedText(labeled);
+                  else setRawText(labeled);
+                }}
+              />
+              <PrecedentPanel text={enhancedText || rawText} />
               {rawText && (
                 <MultiDocPanel rawText={rawText} customInstructions={customInstructions} />
+              )}
+              {enhancedText && (
+                <>
+                  <MatterPanel
+                    dictationId={history[0]?.id}
+                    durationSeconds={duration}
+                    rawText={rawText}
+                  />
+                  <SharePanel
+                    title={`${MODES.find(m => m.value === mode)?.label || 'Dictation'} · ${new Date().toLocaleDateString()}`}
+                    content={enhancedText}
+                    mode={mode}
+                  />
+                  <EsignPanel
+                    documentContent={enhancedText}
+                    documentName={`${MODES.find(m => m.value === mode)?.label || 'Document'}.docx`}
+                  />
+                </>
               )}
             </div>
           )}

@@ -202,7 +202,7 @@ export function SharePanel({ title, content, mode }: SharePanelProps) {
     loadShares();
   }
 
-  async function handleCreate(e: React.FormEvent) {
+  async function handleCreate(e: { preventDefault(): void }) {
     e.preventDefault();
     if (!content?.trim()) {
       setCreateError('No content to share. Add dictation text first.');
@@ -242,7 +242,7 @@ export function SharePanel({ title, content, mode }: SharePanelProps) {
     try {
       const res = await fetch(`/api/share/${id}`, { method: 'DELETE' });
       if (!res.ok) throw new Error('Revoke failed');
-      setShares((prev) => prev.filter((s) => s.id !== id));
+      setShares((prev: ShareRecord[]) => prev.filter((s: ShareRecord) => s.id !== id));
       if (created?.id === id) setCreated(null);
     } catch {
       // silently — user can retry
@@ -251,7 +251,7 @@ export function SharePanel({ title, content, mode }: SharePanelProps) {
     }
   }
 
-  const activeShares = shares.filter((s) => !s.revoked && !isExpired(s.expiresAt));
+  const activeShares = shares.filter((s: ShareRecord) => !s.revoked && !isExpired(s.expiresAt));
   const hasContent = !!(content?.trim());
 
   return (
@@ -263,7 +263,7 @@ export function SharePanel({ title, content, mode }: SharePanelProps) {
         {/* Collapsible header */}
         <button
           type="button"
-          onClick={() => setCollapsed((v) => !v)}
+          onClick={() => setCollapsed((v: boolean) => !v)}
           className="w-full flex items-center justify-between gap-3 px-4 py-3 text-left hover:bg-ink-800/40 transition-colors"
           aria-expanded={!collapsed}
         >
@@ -482,7 +482,7 @@ export function SharePanel({ title, content, mode }: SharePanelProps) {
                       />
                       <button
                         type="button"
-                        onClick={() => setShowPassword((v) => !v)}
+                        onClick={() => setShowPassword((v: boolean) => !v)}
                         className="absolute right-2.5 top-1/2 -translate-y-1/2 text-ink-500 hover:text-ink-300 transition-colors"
                         aria-label={showPassword ? 'Hide password' : 'Show password'}
                         tabIndex={-1}

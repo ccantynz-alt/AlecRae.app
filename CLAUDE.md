@@ -106,12 +106,15 @@
 - [ ] Native notification support
 - [ ] Background audio recording
 
-### Wave 6 — Moat Widening (PLANNED)
-- [ ] **Speaker Diarization** — Pyannote or Whisper-based, labels "Counsel:", "Witness:", timestamps (nobody in legal-AI has this dialled in)
-- [ ] **Conflict-of-Interest Guardian** — extract names from dictation, cross-reference firm client roster, real-time flag (requires DATABASE_URL)
-- [ ] **Precedent Match** — semantic search over firm's past dictations via pg_vector embeddings
-- [ ] **E-Signature Handoff** — DocuSign/Adobe Sign push after enhancement (API integration)
-- [ ] **Matter-Linked Billing** — tag dictation to matter/client, auto-export billable time to time-tracking software
+### Wave 6 — Moat Widening (COMPLETE — 20 April 2026)
+- [x] **Speaker Diarization** — heuristic turn detection with Q/A alternation, COUNSEL/WITNESS/THE COURT prefix parsing, context-aware labelling (deposition/meeting/interview/client-call), inline editable speaker relabel (`lib/diarization.ts`, `app/api/diarize`, `app/components/features/DiarizationPanel.tsx`)
+- [x] **Conflict-of-Interest Guardian** — name + organisation extraction (titled names, case captions, corporate-suffix heuristics), in-memory client roster with current/former/adverse/prospect classifications, fuzzy-match conflict scan with severity grading (`lib/name-extract.ts`, `lib/client-roster.ts`, `app/api/clients`, `app/api/conflicts`, `app/components/features/ConflictPanel.tsx`)
+- [x] **Precedent Match** — TF-IDF cosine-similarity search over the user's localStorage history, 240-char contextual snippets, highlighted matched terms, score bars (`lib/precedent.ts`, `app/api/precedents`, `app/components/features/PrecedentPanel.tsx`)
+- [x] **E-Signature Handoff** — DocuSign eSignature REST v2.1 + Adobe Sign REST v6 integrations (JWT Bearer Grant for DocuSign, OAuth for AdobeSign), env-gated stubs when keys absent, provider picker + recipient list + subject/message UI (`lib/esign.ts`, `app/api/esign/send`, `app/api/esign/status`, `app/components/features/EsignPanel.tsx`)
+- [x] **Matter-Linked Billing** — matter CRUD + time-entry logging with auto-fill from dictation, five export formats (generic CSV, Actionstep, Clio, MyCase, PracticePanther) with correct vendor column headers, duration tracking, date-range filters (`lib/matter-store.ts`, `app/api/matters`, `app/api/time-entries`, `app/api/time-entries/export`, `app/components/features/MatterPanel.tsx`)
+- [x] **Dictation Share Links** — crypto-random 24-byte tokens, PBKDF2 password protection (optional), configurable expiry (1h/1d/1w/never), revocable, view-count tracking, public `/share/[token]` viewer page with print-friendly CSS and no auth (`lib/share-store.ts`, `app/api/share`, `app/api/share/[id]`, `app/api/share/view/[token]`, `app/share/[token]/page.tsx`, `app/components/features/SharePanel.tsx`)
+- [x] All Wave 6 panels wired into main dictation UI Intelligence section
+- [x] Middleware matcher extended to cover new protected routes + public share exceptions
 
 ### Phase 4 — Advanced Features — PARTIALLY DONE
 - [x] Real-time streaming transcription (Live mode)
