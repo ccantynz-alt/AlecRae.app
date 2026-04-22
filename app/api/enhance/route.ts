@@ -2,6 +2,7 @@ import { NextRequest } from 'next/server';
 import Anthropic from '@anthropic-ai/sdk';
 import { SYSTEM_PROMPTS, DocMode } from '@/lib/templates';
 import { rateLimiters } from '@/lib/rate-limit';
+import { requireEnhanceEnv } from '@/lib/env-check';
 
 export const maxDuration = 120;
 
@@ -35,6 +36,17 @@ const DEFAULT_MAX_TOKENS = 8192;
 export async function POST(request: NextRequest) {
   const limited = rateLimiters.enhance(request);
   if (limited) return limited;
+
+  const env = requireEnhanceEnv();
+  if (!env.ok) {
+    return new Response(
+      JSON.stringify({ error: env.message, code: env.code, missing: env.missing }),
+      {
+        status: env.status,
+        headers: { 'Content-Type': 'application/json' },
+      }
+    );
+  }
 
   try {
     const { text, mode = 'general', customInstructions = '' } = await request.json();

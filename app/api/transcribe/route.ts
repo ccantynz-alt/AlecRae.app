@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import OpenAI from 'openai';
 import { rateLimiters } from '@/lib/rate-limit';
 import { getVocabularyForMode } from '@/lib/legal-vocabulary';
+import { requireTranscribeEnv } from '@/lib/env-check';
 
 const VOCAB_CHAR_LIMIT = 800;
 
@@ -43,6 +44,14 @@ export const maxDuration = 60;
 export async function POST(request: NextRequest) {
   const limited = rateLimiters.transcribe(request);
   if (limited) return limited;
+
+  const env = requireTranscribeEnv();
+  if (!env.ok) {
+    return NextResponse.json(
+      { error: env.message, code: env.code, missing: env.missing },
+      { status: env.status }
+    );
+  }
 
   try {
     const formData = await request.formData();

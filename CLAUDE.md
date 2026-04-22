@@ -22,7 +22,7 @@
 
 ## LIVE BUILD CHECKLIST
 
-> **Last updated:** 2026-04-04
+> **Last updated:** 2026-04-20
 > Check this FIRST to know what's done and what needs building next.
 
 ### Core Dictation (COMPLETE)
@@ -63,6 +63,25 @@
 - [x] Pre-loaded legal/accounting vocabulary (5,000+ built-in terms across 15 categories, mode-specific selection)
 - [x] Audio playback of original recordings (base64 storage, play/pause, progress bar, 5MB cap)
 
+### Wave 5 — Launch Readiness + Killer Features (COMPLETE — 20 April 2026)
+- [x] **Citation Intelligence** — auto-detects NZ/UK/US/AU case law, neutral citations, law reports, statutes, and regulations with jurisdiction-badged chips, click-to-copy, and invalid-format flagging (`lib/citations.ts`, `app/api/citations`, `app/components/features/CitationPanel.tsx`)
+- [x] **Multi-Document Chain** — one dictation generates up to 4 document variants in parallel via SSE with per-card streaming, error isolation, and abort-all cancel (`lib/multi-doc.ts`, `app/api/multi-doc`, `app/components/features/MultiDocPanel.tsx`)
+- [x] **Redaction Copilot** — auto-detects PII (email, phone NZ/UK/US/AU, IRD/SSN/NINO/TFN, NZ bank/IBAN/Luhn-checked cards, addresses, DOB, amounts ≥$10k, titled names, NZ case numbers) with per-type toggles and one-click redact (`lib/redaction.ts`, `app/api/redact`, `app/components/features/RedactionPanel.tsx`)
+- [x] **Compliance Copilot** — mode-specific rule engine for UPL, privilege markers, court-filing formality, fee arrangements, Circular 230, AICPA independence, GAAP/IFRS citation, tax year specificity, materiality, limitation periods, vague urgency (`lib/compliance.ts`, `app/api/compliance`, `app/components/features/CompliancePanel.tsx`)
+- [x] Feature panels wired into main dictation UI (Intelligence section below Enhanced panel)
+- [x] Landing page (/ replaces login with marketing, hero, competitive comparison table, built-for-both-sides, pricing preview, final CTA)
+- [x] Terms of Service (/terms — attorney-grade, NZ governing law, 17 sections covering professional responsibility disclaimer, confidentiality, dispute resolution via AMINZ)
+- [x] Pricing (/pricing — Free/Pro/Enterprise tiers + FAQ covering data-training, HIPAA, cancellation, exports, multi-seat)
+- [x] About (/about — brand, mission, philosophy, MarcoReid hierarchy, tech stack, NZ-built)
+- [x] Contact (/contact — sales/support/legal channels, enterprise demo CTA, mailing address)
+- [x] Error boundary (`app/error.tsx`) — graceful recovery with try-again + support link + digest reference
+- [x] 404 page (`app/not-found.tsx`)
+- [x] Login moved to `/login` (dedicated route, JWT flow preserved, register/forgot flows intact)
+- [x] Footer component (product, company, legal links + copyright + brand hierarchy)
+- [x] Environment variable validation (`lib/env-check.ts`) — clean 503 on missing OPENAI/ANTHROPIC keys instead of crash
+- [x] API hardening (transcribe/enhance call `assertOpenAIKey`/`assertAnthropicKey`)
+- [x] Middleware updated to allow public access to /, /terms, /privacy, /pricing, /about, /contact, /login
+
 ### Wave 3 Features (COMPLETE — April 2026)
 - [x] Complete auth system — registration with password strength, forgot/reset password, premium login page
 - [x] In-memory user store fallback (works without DATABASE_URL)
@@ -86,6 +105,16 @@
 - [ ] Capacitor wrapper for Google Play Store
 - [ ] Native notification support
 - [ ] Background audio recording
+
+### Wave 6 — Moat Widening (COMPLETE — 20 April 2026)
+- [x] **Speaker Diarization** — heuristic turn detection with Q/A alternation, COUNSEL/WITNESS/THE COURT prefix parsing, context-aware labelling (deposition/meeting/interview/client-call), inline editable speaker relabel (`lib/diarization.ts`, `app/api/diarize`, `app/components/features/DiarizationPanel.tsx`)
+- [x] **Conflict-of-Interest Guardian** — name + organisation extraction (titled names, case captions, corporate-suffix heuristics), in-memory client roster with current/former/adverse/prospect classifications, fuzzy-match conflict scan with severity grading (`lib/name-extract.ts`, `lib/client-roster.ts`, `app/api/clients`, `app/api/conflicts`, `app/components/features/ConflictPanel.tsx`)
+- [x] **Precedent Match** — TF-IDF cosine-similarity search over the user's localStorage history, 240-char contextual snippets, highlighted matched terms, score bars (`lib/precedent.ts`, `app/api/precedents`, `app/components/features/PrecedentPanel.tsx`)
+- [x] **E-Signature Handoff** — DocuSign eSignature REST v2.1 + Adobe Sign REST v6 integrations (JWT Bearer Grant for DocuSign, OAuth for AdobeSign), env-gated stubs when keys absent, provider picker + recipient list + subject/message UI (`lib/esign.ts`, `app/api/esign/send`, `app/api/esign/status`, `app/components/features/EsignPanel.tsx`)
+- [x] **Matter-Linked Billing** — matter CRUD + time-entry logging with auto-fill from dictation, five export formats (generic CSV, Actionstep, Clio, MyCase, PracticePanther) with correct vendor column headers, duration tracking, date-range filters (`lib/matter-store.ts`, `app/api/matters`, `app/api/time-entries`, `app/api/time-entries/export`, `app/components/features/MatterPanel.tsx`)
+- [x] **Dictation Share Links** — crypto-random 24-byte tokens, PBKDF2 password protection (optional), configurable expiry (1h/1d/1w/never), revocable, view-count tracking, public `/share/[token]` viewer page with print-friendly CSS and no auth (`lib/share-store.ts`, `app/api/share`, `app/api/share/[id]`, `app/api/share/view/[token]`, `app/share/[token]/page.tsx`, `app/components/features/SharePanel.tsx`)
+- [x] All Wave 6 panels wired into main dictation UI Intelligence section
+- [x] Middleware matcher extended to cover new protected routes + public share exceptions
 
 ### Phase 4 — Advanced Features — PARTIALLY DONE
 - [x] Real-time streaming transcription (Live mode)

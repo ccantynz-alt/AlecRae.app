@@ -4,6 +4,18 @@ import { useState, useRef, useCallback, useEffect } from 'react';
 import { detectDocumentType } from '@/lib/auto-detect';
 import { BUILT_IN_TEMPLATES, fillTemplate, type DocumentTemplate } from '@/lib/templates-fillable';
 import { useBranding } from '@/lib/BrandingContext';
+import {
+  CitationPanel,
+  RedactionPanel,
+  CompliancePanel,
+  MultiDocPanel,
+  DiarizationPanel,
+  PrecedentPanel,
+  ConflictPanel,
+  EsignPanel,
+  MatterPanel,
+  SharePanel,
+} from '@/app/components/features';
 
 // === Types ===
 type DocMode = 'general' | 'legal-letter' | 'legal-memo' | 'court-filing' | 'demand-letter' | 'deposition-summary' | 'engagement-letter' | 'accounting-report' | 'tax-advisory' | 'audit-opinion' | 'client-email' | 'meeting-notes';
@@ -1293,6 +1305,51 @@ export default function DictationApp() {
               </div>
             </div>
           </div>
+
+          {/* Intelligence panels (Wave 5 + Wave 6) */}
+          {(rawText || enhancedText) && (
+            <div className="shrink-0 space-y-3">
+              <CitationPanel text={enhancedText || rawText} />
+              <CompliancePanel text={enhancedText || rawText} mode={mode} />
+              <ConflictPanel text={enhancedText || rawText} />
+              <RedactionPanel
+                text={enhancedText || rawText}
+                onRedact={(redacted) => {
+                  if (enhancedText) setEnhancedText(redacted);
+                  else setRawText(redacted);
+                }}
+              />
+              <DiarizationPanel
+                text={enhancedText || rawText}
+                onRelabel={(labeled) => {
+                  if (enhancedText) setEnhancedText(labeled);
+                  else setRawText(labeled);
+                }}
+              />
+              <PrecedentPanel text={enhancedText || rawText} />
+              {rawText && (
+                <MultiDocPanel rawText={rawText} customInstructions={customInstructions} />
+              )}
+              {enhancedText && (
+                <>
+                  <MatterPanel
+                    dictationId={history[0]?.id}
+                    durationSeconds={duration}
+                    rawText={rawText}
+                  />
+                  <SharePanel
+                    title={`${MODES.find(m => m.value === mode)?.label || 'Dictation'} · ${new Date().toLocaleDateString()}`}
+                    content={enhancedText}
+                    mode={mode}
+                  />
+                  <EsignPanel
+                    documentContent={enhancedText}
+                    documentName={`${MODES.find(m => m.value === mode)?.label || 'Document'}.docx`}
+                  />
+                </>
+              )}
+            </div>
+          )}
 
           {/* Batch Transcription Panel */}
           {showBatchPanel && (
